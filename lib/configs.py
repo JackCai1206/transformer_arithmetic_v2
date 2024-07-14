@@ -10,6 +10,7 @@ class ScriptArguments:
 class ModelArguments:
     model_id: Optional[str] = None
     from_pretrained: bool = False
+    architecture: Optional[str] = 'mamba'
     use_lora: bool = False
     hidden_size: Optional[int] = 768
     num_attention_heads: Optional[int] = 12

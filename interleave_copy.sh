@@ -1,13 +1,18 @@
 # --model_id='state-spaces/mamba-130m-hf' \
 CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
     --from_pretrained=False \
-    --use_lora=False \
-    --state_size=100 \
-    --num_layers=4 \
+    --hidden_size=384 \
+    --num_attention_heads=6 \
+    --num_layers=6 \
+    --max_position_embeddings=512 \
     \
     \
     --n_digits_train=128 \
-    --op='copy' \
+    --n_digits_train_min=5 \
+    --n_digits_eval_start=128 \
+    --n_digits_eval_end=256 \
+    --n_digits_eval_step=32 \
+    --op='interleave_copy' \
     \
     \
     --run_name='test' \

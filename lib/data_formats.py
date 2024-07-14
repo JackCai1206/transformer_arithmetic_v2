@@ -47,10 +47,21 @@ def get_COT(a, b):
 def get_reverse(a, b):
     return f'{str(a)[::-1]}+{str(b)[::-1]}=', f'{str(a+b)[::-1]}'
 
-def get_nar(a, n=3):
+def get_nar(a, n=5):
     i = randint(0, len(a) - n)
 
     prompt = f'{a}[SEP]{a[i:i+n-1]}'
     target = a[i+n-1]
     
+    return prompt, target
+
+def get_copy(a):
+    return f'{a}[SEP]', a
+
+def get_interleave_copy(a, b):
+    a_digits, b_digits, carries = split_digits(a, b)
+    
+    prompt = f'{str(a)[::-1]}+{str(b)[::-1]}='
+    target = ''.join(f'{da}{db}' for da, db in zip(a_digits, b_digits))
+
     return prompt, target

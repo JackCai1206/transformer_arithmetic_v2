@@ -1,0 +1,3 @@
+- Show pretrained models on copy tasks and addition
+- Curriculum learning interleaved copy --> add + carry hint --> add
+- Whats going on with the CAT model? 

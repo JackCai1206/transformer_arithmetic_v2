@@ -1,4 +1,7 @@
+from dataclasses import dataclass
 import itertools
+
+import torch
 from .configs import DataArguments
 from .data_formats import get_copy, get_nar, get_reverse, get_COT, get_interleave_copy
 
@@ -6,9 +9,10 @@ import random
 import numpy as np
 from datasets import IterableDataset, concatenate_datasets, Dataset
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
+from transformers.data.data_collator import _torch_collate_batch
 
 def get_line(a, b, op=None, format=None, train=None):
-    if op == '+':
+    if op == 'add':
         if format == 'reverse':
             return get_reverse(a, b)
         elif format == 'COT':
@@ -29,8 +33,8 @@ def data_generator_factory(args: DataArguments, tokenizer: PreTrainedTokenizer, 
         for _ in shard:
             nda = random.randint(args.n_digits_train_min, n_digits_a) if sample_n_digits else n_digits_a
             ndb = random.randint(args.n_digits_train_min, n_digits_b) if sample_n_digits else n_digits_b
-            a = ''.join([str(random.randint(0, 9)) for _ in range(nda)])
-            b = ''.join([str(random.randint(0, 9)) for _ in range(ndb)])
+            a = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(nda - 1)])
+            b = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(ndb - 1)])
             prompt, target = get_line(a, b, op=args.op, format=args.format, train=train)
             prompt = f"{tokenizer.bos_token}{prompt}"
             target = f"{target}{tokenizer.eos_token}"
@@ -48,7 +52,8 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         target_ids = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
         batch_new['input_ids'] = [p + t for p, t in zip(prompt_ids, target_ids)]
         batch_new['labels'] = [[-100] * (len(p)) + t for p, t in zip(prompt_ids, target_ids)]
-        batch_new['example_ids'] = [[i] * len(p + t) for i, (p, t) in enumerate(zip(prompt_ids, target_ids))]
+        # batch_new['labels'] = [p + t for p, t in zip(prompt_ids, target_ids)]
+        # batch_new['example_ids'] = [[i] * len(p + t) for i, (p, t) in enumerate(zip(prompt_ids, target_ids))]
         return batch_new
 
     def group_texts(examples):
@@ -68,23 +73,37 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         return result
 
     def add_attn_masks(examples):
-        # attention_masks = []
-        # for eids in examples['example_ids']:
         eids = examples['example_ids']
-        attn_mask = (eids[:, None] == eids[None, :])[None, ...]
-        attn_mask = np.tril(attn_mask, -1)
-        attn_mask = (1 - attn_mask) * -10000
-        # attention_masks.append(attn_mask)
-        # examples['attention_mask'] = attention_masks
-        examples['attention_mask'] = attn_mask
+        attn_mask = (eids[:, :, None] == eids[:, None, :])
+        attn_mask = torch.tril(attn_mask, -1)
+        examples['attention_mask'] = attn_mask[:, None, ...]
+
+        # Does not support batch processing
+        # inputs = examples['input_ids']
+        # seq_len = len(inputs)
+        # elens = torch.arange(seq_len)[inputs == tokenizer.bos_token_id] + 1
+        # attn_mask = torch.zeros(seq_len, seq_len, dtype=bool)
+        # for i in range(len(elens)):
+        #     if i == 0:
+        #         attn_mask[0:elens[i], 0:elens[i]] = 1
+        #     else:
+        #         attn_mask[elens[i-1]:elens[i], elens[i-1]:elens[i]] = 1
+        # if elens[-1] != seq_len:
+        #     attn_mask[elens[i-1]:seq_len, elens[i-1]:seq_len] = 1
+        # attn_mask = torch.tril(attn_mask, -1)
+        # attn_mask = (~attn_mask).float() * torch.finfo(torch.float32).min # not compatible with bf16
+        # examples['attention_mask'] = attn_mask[None, ... ]
         return examples
 
     ds = Dataset.from_generator(
         data_generator_factory(args, tokenizer, args.num_train, train=True, n_digits_a=args.n_digits_train, sample_n_digits=True),
     num_proc=10, gen_kwargs={'shard': list(range(args.num_train))}) \
     .map(tokenization, batched=True, batch_size=1000, num_proc=16, remove_columns=['prompt', 'target']) \
-    .map(group_texts, batched=True, batch_size=1000, num_proc=16).with_format('torch') \
-    # .map(add_attn_masks, batched=False, num_proc=4, remove_columns=['example_ids']) # This adds the correct attention masks for packed sequences, but its extremely slow
+    # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
+    # print(f'Cleaned up: {ds.cleanup_cache_files()}')
+
+    # This adds the correct attention masks for packed sequences, but its extremely slow
+    # ds = ds.with_format('torch').map(add_attn_masks, batched=True, batch_size=1000, num_proc=16)
 
     print('----------- Examples from train: -------------')
     for example in itertools.islice(ds, 0, 2):
@@ -95,18 +114,22 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
     
     return ds
 
-def get_eval_dataset(train_args, args: DataArguments, tokenizer: PreTrainedTokenizer):
+def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
     def tokenization(batch):
+        tokenizer.padding_side = 'left'
         batch_new = tokenizer(batch['prompt'], padding='longest', add_special_tokens=False)
+        tokenizer.padding_side = 'right'
         batch_new['labels'] = tokenizer(batch['target'], padding='longest', add_special_tokens=False)['input_ids']
         return batch_new
 
-    ds_list = {
-        n_digits: Dataset.from_generator(
+    ds_list = {}
+    for n_digits in range(args.n_digits_eval_start, args.n_digits_eval_end + 1, args.n_digits_eval_step):
+        ds_list[str(n_digits)] = Dataset.from_generator(
             data_generator_factory(args, tokenizer, args.num_eval, train=False, n_digits_a=n_digits),
         num_proc=10, gen_kwargs={'shard': list(range(args.num_eval))}) \
-        .map(tokenization, batched=True, batch_size=10000, num_proc=16).with_format('torch')
-    for n_digits in range(args.n_digits_eval_start, args.n_digits_eval_end + 1, args.n_digits_eval_step)}
+        .map(tokenization, batched=True, batch_size=args.num_eval, num_proc=16, remove_columns=['prompt', 'target']) \
+        .remove_columns(['token_type_ids'])
+        # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
 
 
     print('----------- Examples from eval: -------------')
@@ -118,3 +141,37 @@ def get_eval_dataset(train_args, args: DataArguments, tokenizer: PreTrainedToken
             print(tokenizer.decode(example['labels']))
 
     return ds_list
+
+# @dataclass
+# class PromptAnswerDataCollator:
+#     tokenizer: PreTrainedTokenizer
+    
+#     def __call__(self, features):
+#         # convert to dict of lists and pop the labels
+#         features = {key: [example[key] for example in features] for key in features[0].keys()}
+#         labels = features.pop('labels', None)
+#         # attention_mask = features.pop('attention_mask', None)
+
+#         # left-pad the inputs
+#         prev_padding_side = self.tokenizer.padding_side
+#         self.tokenizer.padding_side = 'left'
+#         batch = self.tokenizer.pad(features, padding='longest', return_tensors='pt')
+
+#         if train_labels is not None:
+#             batch['labels'] = _torch_collate_batch(train_labels, self.tokenizer)
+
+#         if eval_labels is not None:
+#             # For evaluation, manually right-pad the labels (everything else is left-padded)
+#             self.tokenizer.padding_side = 'right'
+#             batch['labels'] = _torch_collate_batch(eval_labels, self.tokenizer)
+#         self.tokenizer.padding_side = prev_padding_side
+
+#         # add in 4D attention mask, workaround for https://github.com/huggingface/transformers/issues/32101
+#         # if attention_mask is not None:
+#         #     if not isinstance(attention_mask[0], torch.Tensor): # list of lists
+#         #         batch['attention_mask'] = torch.tensor(attention_mask, dtype=torch.long)
+#         #     else:
+#         #         batch['attention_mask'] = torch.stack(attention_mask, dim=0)
+#         #         # batch['attention_mask'] = (~batch['attention_mask']).float() * torch.finfo(torch.float32).min # not compatible with bf16
+
+#         return batch

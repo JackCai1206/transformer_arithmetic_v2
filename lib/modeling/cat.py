@@ -6,15 +6,42 @@ from typing import Optional, Tuple
 from torch.nn import functional as F
 import math
 
+class CausalConv1d(torch.nn.Conv1d):
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size,
+                 stride=1,
+                 dilation=1,
+                 groups=1,
+                 bias=True):
+
+        super(CausalConv1d, self).__init__(
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=0,
+            dilation=dilation,
+            groups=groups,
+            bias=bias)
+        
+        self.__padding = (kernel_size - 1) * dilation
+        
+    def forward(self, input):
+        return super(CausalConv1d, self).forward(F.pad(input, (self.__padding, 0)))
+
 class ConvLlamaAttention(LlamaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: int):
         super().__init__(config, layer_idx)
-        # self.query_conv = nn.Conv1d(config.hidden_size, config.hidden_size, kernel_size=5, padding=2)
-        # self.key_conv   = nn.Conv1d(config.hidden_size, config.hidden_size, kernel_size=5, padding=2)
-        # self.value_conv = nn.Conv1d(config.hidden_size, config.hidden_size, kernel_size=5, padding=2)
-        self.query_conv = nn.Identity()
-        self.key_conv = nn.Identity()
-        self.value_conv = nn.Identity()
+        # if layer_idx >= 2 and layer_idx < 4:
+        self.query_conv = CausalConv1d(config.num_attention_heads, config.num_attention_heads, kernel_size=5)
+        self.key_conv   = CausalConv1d(config.num_attention_heads, config.num_attention_heads, kernel_size=5)
+        self.value_conv = CausalConv1d(config.num_attention_heads, config.num_attention_heads, kernel_size=5)
+        # else:
+        #     self.query_conv = nn.Identity()
+        #     self.key_conv = nn.Identity()
+        #     self.value_conv = nn.Identity()
 
     def forward(
         self,
@@ -29,13 +56,13 @@ class ConvLlamaAttention(LlamaAttention):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
-        q_conv = self.query_conv(hidden_states.transpose(1, 2)).transpose(1, 2)
+        q_conv = self.query_conv(hidden_states.reshape(bsz, q_len, self.num_heads, self.head_dim).permute(0, 3, 2, 1).reshape(-1, self.num_heads, q_len)).reshape(bsz, self.head_dim, self.num_heads, q_len).permute(0, 3, 2, 1).reshape(bsz, q_len, -1)
         query_states = self.q_proj(q_conv)
 
-        k_conv = self.key_conv(hidden_states.transpose(1, 2)).transpose(1, 2)
+        k_conv = self.query_conv(hidden_states.reshape(bsz, q_len, self.num_heads, self.head_dim).permute(0, 3, 2, 1).reshape(-1, self.num_heads, q_len)).reshape(bsz, self.head_dim, self.num_heads, q_len).permute(0, 3, 2, 1).reshape(bsz, q_len, -1)
         key_states = self.k_proj(k_conv)
         
-        v_conv = self.value_conv(hidden_states.transpose(1, 2)).transpose(1, 2)
+        v_conv = self.query_conv(hidden_states.reshape(bsz, q_len, self.num_heads, self.head_dim).permute(0, 3, 2, 1).reshape(-1, self.num_heads, q_len)).reshape(bsz, self.head_dim, self.num_heads, q_len).permute(0, 3, 2, 1).reshape(bsz, q_len, -1)
         value_states = self.v_proj(v_conv)
 
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
@@ -43,7 +70,7 @@ class ConvLlamaAttention(LlamaAttention):
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
         cos, sin = self.rotary_emb(value_states, position_ids)
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+        # query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
         if past_key_value is not None:
             # sin and cos are specific to RoPE models; cache_position needed for the static cache
@@ -55,7 +82,6 @@ class ConvLlamaAttention(LlamaAttention):
 
         attn_weights = torch.matmul(query_states, key_states.transpose(2, 3)) / math.sqrt(self.head_dim)
 
-        assert attention_mask is not None
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
             attn_weights = attn_weights + causal_mask

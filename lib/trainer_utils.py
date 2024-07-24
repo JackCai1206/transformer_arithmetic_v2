@@ -60,8 +60,8 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
             gen_kwargs.pop("max_length")
 
         if has_labels:
+            # Don't constrain the min new tokens because the label might be shorter than max
             gen_kwargs["max_new_tokens"] = inputs['labels'].shape[1]
-            gen_kwargs["min_new_tokens"] = inputs['labels'].shape[1]
 
         default_synced_gpus = True if is_deepspeed_zero3_enabled() else False
         gen_kwargs["synced_gpus"] = (
@@ -90,10 +90,12 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         # Retrieves GenerationConfig from model.generation_config
         gen_config = self.model.generation_config
         # in case the batch is shorter than max length, the output should be padded
-        if generated_tokens.shape[-1] < gen_config.max_length:
-            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_config.max_length)
-        elif gen_config.max_new_tokens is not None and generated_tokens.shape[-1] < gen_config.max_new_tokens + 1:
-            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_config.max_new_tokens + 1)
+        max_length = max(
+            max(gen_config.max_length or 0, gen_kwargs.get("max_length", 0)),
+            generation_inputs['input_ids'].shape[-1] + max(gen_config.max_new_tokens or 0, gen_kwargs.get('max_new_tokens', 0))
+        )
+        if generated_tokens.shape[-1] < max_length:
+            generated_tokens = self._pad_tensors_to_max_len(generated_tokens, max_length)
 
         # with torch.no_grad():
         #     if has_labels:
@@ -119,6 +121,8 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         else:
             labels = None
 
+        if torch.any(generated_tokens == -100):
+            breakpoint()
         return loss, generated_tokens, labels
 
 

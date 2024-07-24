@@ -2,7 +2,7 @@ set -e
 
 # --model_id='state-spaces/mamba-130m-hf' \
 for architecture in 'CAT'; do
-    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=offline python run.py \
+    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
         --architecture=$architecture \
         --hidden_size=384 \
         --num_attention_heads=6 \

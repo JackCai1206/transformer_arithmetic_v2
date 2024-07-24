@@ -1,13 +1,17 @@
-from transformers import EvalPrediction, PreTrainedTokenizer, TrainerCallback
+from transformers import EvalPrediction, PreTrainedTokenizer, TrainerCallback, Trainer
 from transformers.integrations import WandbCallback
+import Levenshtein
+import numpy as np
 
 def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction):
     pred = pred_obj.predictions[:, pred_obj.inputs.shape[1]:]
     labels = pred_obj.label_ids
-    min_len = min(pred.shape[1], labels.shape[1])
-    pred = pred[:, :min_len]
-    labels = labels[:, :min_len]
+    # Padding handled in the trainer predict
+    # min_len = min(pred.shape[1], labels.shape[1])
+    # pred = pred[:, :min_len]
+    # labels = labels[:, :min_len]
     accuracy = (pred == labels).all(axis=1).mean()
+    distance = sum([Levenshtein.ratio(pred[bi].tolist(), labels[bi].tolist()) for bi in range(pred.shape[0])]) / pred.shape[0]
 
     prompt_str = tokenizer.batch_decode(pred_obj.inputs[:5])
     pred_str = tokenizer.batch_decode(pred_obj.predictions[:5, pred_obj.inputs.shape[1]:])
@@ -18,12 +22,11 @@ def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction):
         print(f"Pred  : {repr(p)}")
         print(f"Label : {repr(l)}")
 
-    return {'accuracy': accuracy}
+    return {'accuracy': accuracy, 'distance': distance}
 
-# class LogEvalCallback(WandbCallback):
-#     def __init__(self, tokenizer: PreTrainedTokenizer):
-#         super().__init__()
-#         self.tokenizer = tokenizer
+class WandbEvalCallback(WandbCallback):
+    def __init__(self, trainer: Trainer):
+        super().__init__()
 
-#     def on_evaluate(self, args, state, control, metrics):
-#         breakpoint()
+    def on_evaluate(self, args, state, control, metrics, **kwargs):
+        breakpoint()

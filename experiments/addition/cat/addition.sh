@@ -25,7 +25,7 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --max_steps=10000 \
     --learning_rate=5e-4 \
     --lr_scheduler_type='cosine' \
-    --warmup_steps=200 \
+    --warmup_ratio=0.05 \
     --logging_steps=20 \
     --eval_strategy="steps" \
     --eval_steps=200 \
@@ -63,7 +63,7 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
 #     --max_steps=10000 \
 #     --learning_rate=5e-4 \
 #     --lr_scheduler_type='cosine' \
-#     --warmup_steps=200 \
+#     --warmup_ratio=0.05 \
 #     --logging_steps=20 \
 #     --eval_strategy="steps" \
 #     --eval_steps=200 \

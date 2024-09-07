@@ -26,7 +26,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=offline python 
     --max_steps=1000 \
     --learning_rate=5e-4 \
     --lr_scheduler_type='cosine' \
-    --warmup_steps=200 \
+    --warmup_ratio=0.05 \
     --logging_steps=20 \
     --eval_strategy="steps" \
     --eval_steps=200 \

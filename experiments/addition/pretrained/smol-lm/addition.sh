@@ -13,6 +13,9 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --n_digits_eval_start=10 \
     --n_digits_eval_end=128 \
     --n_digits_eval_step=20 \
+    --n_digits_dpo=30 \
+    --n_digits_dpo_min=25 \
+    --num_dpo_data=10000 \
     --op='add' \
     --format='reverse' \
     \
@@ -22,16 +25,18 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --output_dir=out \
     --do_train=False \
     --do_eval=False \
-    --max_steps=500 \
+    --remove_unused_columns=False \
+    --max_steps=1000 \
     --learning_rate=3e-3 \
     --lr_scheduler_type='cosine' \
-    --warmup_steps=200 \
-    --logging_steps=20 \
-    --eval_strategy="no" \
-    --eval_steps=200 \
+    --warmup_ratio=0.05 \
+    --logging_steps=10 \
+    --eval_strategy="steps" \
+    --eval_steps=50 \
+    --eval_on_start=True \
     --predict_with_generate \
-    --per_device_train_batch_size=64 \
-    --per_device_eval_batch_size=100 \
+    --per_device_train_batch_size=50 \
+    --per_device_eval_batch_size=1024 \
     --gradient_accumulation_steps=16 \
     --include_inputs_for_metrics=True \
     --tf32=True \

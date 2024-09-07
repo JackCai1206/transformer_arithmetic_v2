@@ -26,7 +26,7 @@ for architecture in 'CAT'; do
         --max_steps=5000 \
         --learning_rate=5e-4 \
         --lr_scheduler_type='cosine' \
-        --warmup_steps=200 \
+        --warmup_ratio=0.05 \
         --logging_steps=20 \
         --eval_strategy="steps" \
         --eval_steps=200 \

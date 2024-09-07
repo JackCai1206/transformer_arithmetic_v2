@@ -67,10 +67,11 @@ class CharacterTokenizer(PreTrainedTokenizer):
 
     @property
     def vocab_size(self) -> int:
-        return len(self._vocab_str_to_int)
+        return len(self.get_vocab())
 
     def get_vocab(self):
-        return self._vocab_str_to_int
+        filtered_vocab = {k: v for k, v in self._vocab_str_to_int.items() if v >= 0}
+        return filtered_vocab | self._added_tokens_encoder
 
     def _tokenize(self, text: str) -> List[str]:
         return list(text)

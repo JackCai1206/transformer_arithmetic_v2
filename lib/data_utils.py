@@ -1,57 +1,144 @@
 from dataclasses import dataclass
 import itertools
+from typing import List, Tuple
 
 import torch
+from torch.nn.utils.rnn import pad_sequence
 from .configs import DataArguments
-from .data_formats import get_copy, get_nar, get_reverse, get_COT, get_interleave_copy
+from .data_formats import get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
 
 import random
 import numpy as np
-from datasets import IterableDataset, concatenate_datasets, Dataset
+from datasets import IterableDataset, Dataset, interleave_datasets
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
+from trl.trainer.utils import DPODataCollatorWithPadding
 
 def get_line(a, b, op=None, format=None, train=None):
     if op == 'add':
         if format == 'reverse':
-            return get_reverse(a, b)
+            return get_reverse_add(a, b)
         elif format == 'COT':
             return get_COT(a, b)
+        elif format == 'reverse-no-carry':
+            return get_reverse_no_carry(a, b)
+        elif format == 'reverse-carry-only':
+            return get_reverse_carry_only(a, b)
+        elif format == 'forward':
+            return get_forward(a, b)
+        elif format == 'forward-no-carry':
+            return get_forward_no_carry(a, b)
+        elif format == 'forward-carry-only':
+            return get_forward_carry_only(a, b)
+        elif format == 'cont-tokens':
+            return get_reverse_add_cont(a, b)
+        elif format == 'automata_A':
+            return get_reverse_add_automata(a, b, type='A')
+        elif format == 'automata_B':
+            return get_reverse_add_automata(a, b, type='B')
+        elif format == 'automata_C':
+            return get_reverse_add_automata(a, b, type='C')
+    elif op == 'sort':
+        if format == 'sort':
+            return get_sort(a)
+        elif format == 'min':
+            return get_minimum(a)
+        elif format == 'set_diff':
+            return get_set_diff(a)
+        elif format == 'sort_rev':
+            return get_sort(a, reverse=True)
     elif op == 'nar':
         return get_nar(a, n=format['n'])
-    elif op == 'interleave_copy': 
-        return get_interleave_copy(a, b)
     elif op == 'copy':
-        return get_copy(a)
-    
+        if format == 'interleave_copy': 
+            return get_interleave_copy(a, b)
+        elif format == 'reverse_2op':
+            return get_reverse_2op(a, b)
+        elif format == 'itcopy_rev':
+            return get_itcopy_rev(a, b)
+        elif format == 'copy':
+            return get_copy(a)
+    elif op == 'rotate1':
+        return get_rotate1(a)
+    elif op == 'reverse':
+        return get_reverse(a)
+    elif op == 'rot1rev':
+        return get_rot1rev(a)
+    elif op == 'mult':
+        if format == 'sd_mult':
+            return get_sd_mult(a, b)
+        elif format == 'mult':
+            return get_mult(a, b)
+    elif op == 'cumsum':
+        return get_cumsum(a)
+    elif op == 'gt5':
+        return get_gt5(a)
+    elif op == 'cumsum_gt5':
+        return get_cumsum_gt5(a)
+
     raise ValueError(f'Unknown op or format: {op}, {format}')
 
-def data_generator_factory(args: DataArguments, tokenizer: PreTrainedTokenizer, num_examples: int, train: bool = True, n_digits_a: int | None = None, n_digits_b: int | None = None, sample_n_digits: bool = False):
-    if n_digits_b is None:
-        n_digits_b = n_digits_a
-    def generate_data(shard):
-        for _ in shard:
-            nda = random.randint(args.n_digits_train_min, n_digits_a) if sample_n_digits else n_digits_a
-            ndb = random.randint(args.n_digits_train_min, n_digits_b) if sample_n_digits else n_digits_b
+def data_generator(
+    op: str,
+    format: str,
+    show_task_ids: bool, 
+    n_digits_a_range: Tuple[int] = None,
+    n_digits_b_range: Tuple[int] | None = None,
+    train: bool = True,
+    shard: List[int] = None,
+):
+    if n_digits_b_range is None:
+        n_digits_b_range = n_digits_a_range
+
+    assert len(shard) == 1
+    for _ in shard[0]:
+        if op == 'sort':
+            # Generate a random list of digits
+            nda = random.randint(*n_digits_a_range)
+            a = random.sample(range(100), nda)
+            prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
+        else:
+            nda = random.randint(*n_digits_a_range)
+            if op == 'mult':
+                ndb = 2 # always 3 digits for b
+            elif op == 'add' and 'automata' in format:
+                ndb = nda
+            else:
+                ndb = random.randint(*n_digits_b_range)
             a = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(nda - 1)])
             b = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(ndb - 1)])
-            prompt, target = get_line(a, b, op=args.op, format=args.format, train=train)
-            prompt = f"{tokenizer.bos_token}{prompt}"
-            target = f"{target}{tokenizer.eos_token}"
-            yield {
-                'prompt': prompt,
-                'target': target
-            }
+            prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
+            if not show_task_ids: 
+                prompt = prompt[:-2] + prompt[-1]
 
-    return generate_data
+        if loss_mask is None:
+            loss_mask = [1] * len(target)
+
+        yield {
+            'prompt': prompt,
+            'target': target,
+            'loss_mask': loss_mask,
+        }
+
+
 
 def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def add_special_tokens(batch, add_eos=True):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        if add_eos:
+            batch['target'] = [i + tokenizer.eos_token for i in batch['target']]
+            batch['loss_mask'] = [i + [1] for i in batch['loss_mask']]
+        return batch
+
+    def mask_target(target_ids, loss_mask):
+        return [t if m == 1 else -100 for t, m in zip(target_ids, loss_mask)]
+
     def tokenization(batch):
         batch_new = {}
         prompt_ids = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False)['input_ids']
         target_ids = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
         batch_new['input_ids'] = [p + t for p, t in zip(prompt_ids, target_ids)]
-        batch_new['labels'] = [[-100] * (len(p)) + t for p, t in zip(prompt_ids, target_ids)]
+        batch_new['labels'] = [[-100] * (len(p)) + mask_target(t, m) for p, t, m in zip(prompt_ids, target_ids, batch['loss_mask'])]
         # batch_new['labels'] = [p + t for p, t in zip(prompt_ids, target_ids)]
         # batch_new['example_ids'] = [[i] * len(p + t) for i, (p, t) in enumerate(zip(prompt_ids, target_ids))]
         return batch_new
@@ -95,83 +182,165 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         # examples['attention_mask'] = attn_mask[None, ... ]
         return examples
 
-    ds = Dataset.from_generator(
-        data_generator_factory(args, tokenizer, args.num_train, train=True, n_digits_a=args.n_digits_train, sample_n_digits=True),
-    num_proc=10, gen_kwargs={'shard': list(range(args.num_train))}) \
-    .map(tokenization, batched=True, batch_size=1000, num_proc=16, remove_columns=['prompt', 'target']) \
+    ds_list = []
+    for opi, frac in enumerate(args.op_dist_train):
+        ds = IterableDataset.from_generator(
+            data_generator,
+            gen_kwargs={
+                'train': True,
+                'op': args.op_train[opi],
+                'format': args.format_train[opi],
+                'n_digits_a_range': args.n_digits_train[opi],
+                'shard': [range(i * round((args.num_train * frac) // args.nproc), (i + 1) * round((args.num_train * frac) // args.nproc)) for i in range(args.nproc)],
+                'show_task_ids': args.show_task_ids
+            },
+        )
+        ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
+        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask'])
+        ds_list.append(ds)
+
+    op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]
+    ds = interleave_datasets(ds_list, probabilities=op_dist_train).shuffle(train_args.seed)
     # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
     # print(f'Cleaned up: {ds.cleanup_cache_files()}')
 
     # This adds the correct attention masks for packed sequences, but its extremely slow
     # ds = ds.with_format('torch').map(add_attn_masks, batched=True, batch_size=1000, num_proc=16)
 
+    # l = []
     print('----------- Examples from train: -------------')
-    for example in itertools.islice(ds, 0, 2):
+    for example in itertools.islice(ds, 0, 100):
         print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
         print(example['labels'])
         print(tokenizer.decode(example['labels']))
+        # l.append(len(example['input_ids']))
+        
+    # import matplotlib.pyplot as plt
+    # plt.hist(l, bins=100)
+    # plt.savefig('train_hist.png')
+    # breakpoint()
     
     return ds
 
 def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def add_special_tokens(batch, add_eos=True):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        if add_eos:
+            batch['target'] = [i + tokenizer.eos_token for i in batch['target']]
+            batch['loss_mask'] = [i + [1] for i in batch['loss_mask']]
+        return batch
+
     def tokenization(batch):
-        tokenizer.padding_side = 'left'
-        batch_new = tokenizer(batch['prompt'], padding='longest', add_special_tokens=False)
-        tokenizer.padding_side = 'right'
-        batch_new['labels'] = tokenizer(batch['target'], padding='longest', add_special_tokens=False)['input_ids']
+        batch_new = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False, return_token_type_ids=False)
+        batch_new['eval_labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
         return batch_new
 
     ds_list = {}
-    for n_digits in range(args.n_digits_eval_start, args.n_digits_eval_end + 1, args.n_digits_eval_step):
-        ds_list[str(n_digits)] = Dataset.from_generator(
-            data_generator_factory(args, tokenizer, args.num_eval, train=False, n_digits_a=n_digits),
-        num_proc=10, gen_kwargs={'shard': list(range(args.num_eval))}) \
-        .map(tokenization, batched=True, batch_size=args.num_eval, num_proc=16, remove_columns=['prompt', 'target']) \
-        .remove_columns(['token_type_ids'])
-        # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
+    for n_digits in range(*args.n_digits_eval):
+        for opi, frac in enumerate(args.op_dist_eval):
+            ds = IterableDataset.from_generator(
+                data_generator,
+                gen_kwargs={
+                    'train': False, 
+                    'op': args.op_eval[opi],
+                    'format': args.format_eval[opi],
+                    'n_digits_a_range': (n_digits, n_digits),
+                    'shard': [range(round(args.num_eval * frac))],
+                    'show_task_ids': args.show_task_ids
+                },
+            )
+            ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
+            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target'])
 
+            key = f'{n_digits}-{args.op_eval[opi]}-{args.format_eval[opi]}'
+            ds_list[key] = ds            
+            # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():
         for example in itertools.islice(ds, 0, 2):
             print(example['input_ids'])
             print(tokenizer.decode(example['input_ids']))
-            print(example['labels'])
-            print(tokenizer.decode(example['labels']))
+            print(example['eval_labels'])
+            print(tokenizer.decode(example['eval_labels']))
 
     return ds_list
 
-# @dataclass
-# class PromptAnswerDataCollator:
-#     tokenizer: PreTrainedTokenizer
+def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def rand_trunc(l):
+        # return l[:random.randint(0, len(l)-1)]
+        return ''.join([str(random.randint(0, 9)) for _ in range(random.randint(0, len(l)-1))])
     
-#     def __call__(self, features):
-#         # convert to dict of lists and pop the labels
-#         features = {key: [example[key] for example in features] for key in features[0].keys()}
-#         labels = features.pop('labels', None)
-#         # attention_mask = features.pop('attention_mask', None)
+    def get_dpo_format(batch):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        batch['chosen'] = [i + tokenizer.eos_token for i in batch['target']]
+        batch['rejected'] = [rand_trunc(i) + tokenizer.eos_token for i in batch['target']]
+        # batch['rejected'] = [tokenizer.eos_token for i in batch['target']]
+        return batch
+    
+    ds = IterableDataset.from_generator(
+        data_generator,
+        gen_kwargs={
+            'train': True,
+            'op': args.op_train[0],
+            'format': args.format_train[0],
+            'n_digits_a_range': args.n_digits_train[0],
+            'shard': [range(i * round((args.num_train * 1) // args.nproc), (i + 1) * round((args.num_train * 1) // args.nproc)) for i in range(args.nproc)]
+        },
+    ) \
+    .map(get_dpo_format, batched=True, batch_size=1000, remove_columns=['target'])
 
-#         # left-pad the inputs
-#         prev_padding_side = self.tokenizer.padding_side
-#         self.tokenizer.padding_side = 'left'
-#         batch = self.tokenizer.pad(features, padding='longest', return_tensors='pt')
+    return ds
 
-#         if train_labels is not None:
-#             batch['labels'] = _torch_collate_batch(train_labels, self.tokenizer)
+class PromptAnswerDataCollator(DPODataCollatorWithPadding):
+    left_pad_list: tuple = ('prompt', 'input_ids', 'labels', 'attention_mask')
 
-#         if eval_labels is not None:
-#             # For evaluation, manually right-pad the labels (everything else is left-padded)
-#             self.tokenizer.padding_side = 'right'
-#             batch['labels'] = _torch_collate_batch(eval_labels, self.tokenizer)
-#         self.tokenizer.padding_side = prev_padding_side
+    def __call__(self, features):
+        # convert to dict of lists and pop the labels
+        features = {
+            key: [example[key] for example in features] for key in features[0].keys()
+        }
+        padded_batch = {}
+        for k, feat in features.items():
+            if k in self.left_pad_list:
+                to_pad = [torch.LongTensor(ex[::-1]) for ex in feat]
+            else:
+                to_pad = [torch.LongTensor(ex) for ex in feat]
+            
+            if k.endswith("input_ids") or k.endswith('eval_labels'):
+                if self.pad_token_id is None:
+                    raise ValueError(
+                        "Padding is enabled, but the tokenizer is not configured with a padding token."
+                        " Explicitly set `tokenizer.pad_token` (e.g. `tokenizer.pad_token = tokenizer.eos_token`)"
+                        " before calling the trainer."
+                    )
+                padding_value = self.pad_token_id
+            elif k.endswith("labels"):
+                padding_value = self.label_pad_token_id
+            elif k.endswith("attention_mask"):
+                padding_value = 0
+            elif k.endswith('loss_mask'):
+                padding_value = 0
+            else:
+                raise ValueError(f"Unexpected key in batch '{k}'")
+            
+            if k == 'eval_labels':
+                input_k = 'labels'
+            else:
+                input_k = k
 
-#         # add in 4D attention mask, workaround for https://github.com/huggingface/transformers/issues/32101
-#         # if attention_mask is not None:
-#         #     if not isinstance(attention_mask[0], torch.Tensor): # list of lists
-#         #         batch['attention_mask'] = torch.tensor(attention_mask, dtype=torch.long)
-#         #     else:
-#         #         batch['attention_mask'] = torch.stack(attention_mask, dim=0)
-#         #         # batch['attention_mask'] = (~batch['attention_mask']).float() * torch.finfo(torch.float32).min # not compatible with bf16
+            padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
 
-#         return batch
+            if k in self.left_pad_list:
+                padded_batch[input_k] = padded_batch[input_k].flip(dims=[1])
+
+        # add in 4D attention mask, workaround for https://github.com/huggingface/transformers/issues/32101
+        # if attention_mask is not None:
+        #     if not isinstance(attention_mask[0], torch.Tensor): # list of lists
+        #         batch['attention_mask'] = torch.tensor(attention_mask, dtype=torch.long)
+        #     else:
+        #         batch['attention_mask'] = torch.stack(attention_mask, dim=0)
+        #         # batch['attention_mask'] = (~batch['attention_mask']).float() * torch.finfo(torch.float32).min # not compatible with bf16
+
+        return padded_batch

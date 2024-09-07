@@ -1,6 +1,9 @@
-from functools import reduce
-from transformers import Seq2SeqTrainer
+from dataclasses import dataclass
+from functools import partial, reduce
+from datasets import Dataset
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from transformers.integrations import WandbCallback
+from trl import DPOTrainer, DPOConfig
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -9,6 +12,7 @@ from torch import nn
 
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
+from lib.data_utils import PromptAnswerDataCollator
 
 class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
     def prediction_step(
@@ -41,9 +45,8 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
             Tuple[Optional[float], Optional[torch.Tensor], Optional[torch.Tensor]]: A tuple with the loss, logits and
             labels (each being optional).
         """
-
         if not self.args.predict_with_generate or prediction_loss_only:
-            return super().super().prediction_step(
+            return super().prediction_step(
                 model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
             )
 
@@ -62,6 +65,7 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         if has_labels:
             # Don't constrain the min new tokens because the label might be shorter than max
             gen_kwargs["max_new_tokens"] = inputs['labels'].shape[1]
+            # gen_kwargs["max_length"] = inputs['labels'].shape[1] + inputs['input_ids'].shape[1]
 
         default_synced_gpus = True if is_deepspeed_zero3_enabled() else False
         gen_kwargs["synced_gpus"] = (
@@ -79,7 +83,14 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
             generation_inputs = {
                 k: v for k, v in inputs.items() if k not in ("decoder_input_ids", "decoder_attention_mask")
             }
-        generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs)
+
+        loss_mask = generation_inputs['loss_mask']
+        del generation_inputs['loss_mask']
+        if (loss_mask == 1).all():
+            generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs)
+        else:
+            logits_processor = TemplateLogitsProcessor(loss_mask, generation_inputs['labels'])
+            generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs, logits_processor=[logits_processor])
 
         # Temporary hack to ensure the generation config is not initialized for each iteration of the evaluation loop
         # TODO: remove this hack when the legacy code that initializes generation_config from a model config is
@@ -121,10 +132,28 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         else:
             labels = None
 
-        if torch.any(generated_tokens == -100):
-            breakpoint()
         return loss, generated_tokens, labels
 
+@dataclass
+class DPOSeq2SeqConfig(DPOConfig, Seq2SeqTrainingArguments):
+    pass
+
+class DPOTrainerDefaultEval(DPOTrainer, Seq2SeqTrainerNoEvalLoss):
+    def __init__(self, *args, train_dataset=None, eval_dataset=None, **kwargs):
+        dummy_train_dataset = Dataset.from_dict({})
+        DPOTrainer.__init__(self, *args, train_dataset=dummy_train_dataset, eval_dataset=None, **kwargs)
+        train_dataset = train_dataset.map(self.tokenize_row)
+        kwargs.pop('ref_model')
+        kwargs['data_collator'] = PromptAnswerDataCollator(pad_token_id=self.tokenizer.pad_token_id, label_pad_token_id=self.label_pad_token_id)
+        Seq2SeqTrainerNoEvalLoss.__init__(self, *args, train_dataset=train_dataset, eval_dataset=eval_dataset, **kwargs)
+
+    def evaluate(self, *args, **kwargs):
+        self.evaluation_loop = partial(Seq2SeqTrainerNoEvalLoss.evaluation_loop, self)
+        self.prediction_step = partial(Seq2SeqTrainerNoEvalLoss.prediction_step, self)
+        results = Seq2SeqTrainerNoEvalLoss.evaluate(self, *args, **kwargs)
+        self.evaluation_loop = partial(DPOTrainer.evaluation_loop, self)
+        self.prediction_step = partial(DPOTrainer.prediction_step, self)
+        return results
 
 class AddWandbConfigCallback(WandbCallback):
     def __init__(self, extra_configs=[], **kwargs):
@@ -135,3 +164,57 @@ class AddWandbConfigCallback(WandbCallback):
         super().setup(args, state, model, **kwargs)
         new_config = reduce(lambda x, y: {**x, **y}, self.extra_configs)
         self._wandb.config.update(new_config, allow_val_change=True)
+
+from transformers import Constraint, LogitsProcessor
+
+class TemplateConstraint(Constraint):
+    def __init__(self, template: List[int]):
+        self.template = template
+        self.count = 0
+        self.test()
+    
+    def advance(self):
+        tok = self.template[self.count]
+        return None if tok == -100 else tok
+    
+    def does_advance(self, token_id: int):
+        tok = self.template[self.count]
+        return token_id == tok or tok == -100
+
+    def update(self, token_id: int):
+        stepped = self.does_advance(token_id)
+        if stepped:
+            self.count += 1
+            completed = self.count == len(self.template)
+            reset = False
+        else:
+            completed = False
+            self.reset()
+            reset = True
+        
+        return stepped, completed, reset
+
+    def reset(self):
+        self.count = 0
+    
+    def remaining(self):
+        return len(self.template) - self.count
+
+    def copy(self, stateful=False):
+        c = TemplateConstraint(self.template)
+        if stateful:
+            c.count = self.count
+        return c
+
+class TemplateLogitsProcessor(LogitsProcessor):
+    def __init__(self, loss_mask: torch.LongTensor, labels: torch.LongTensor):
+        self.force_mask = loss_mask == 0
+        self.labels = labels
+        self.count = 0
+    
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        mask = self.force_mask[:, self.count]
+        labels = self.labels[:, self.count]
+        scores[mask] = scores[mask].scatter(1, labels[mask][:, None], torch.inf)
+        self.count += 1
+        return scores

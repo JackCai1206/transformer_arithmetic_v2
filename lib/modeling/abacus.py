@@ -1,11 +1,10 @@
 from typing import List, Optional, Tuple, Union
-from pytest import Cache
 import torch
 import random
 from transformers import FalconConfig, FalconForCausalLM, LlamaConfig, LlamaForCausalLM
 from transformers.models.falcon.modeling_falcon import FalconRotaryEmbedding
 from transformers.models.llama.modeling_llama import BaseModelOutputWithPast, LlamaModel
-from transformers.cache_utils import DynamicCache
+from transformers.cache_utils import DynamicCache, Cache
 
 # """Implementation of abacus embeddings"""
 # # Example of how to extract digit tokens to pass into constructor
@@ -76,7 +75,7 @@ from transformers.cache_utils import DynamicCache
 
 class AbacusConfig:
     digit_tokens: List[int] = None
-    max_k: int = 256
+    max_k: int = 300
     return_position_ids: bool = False
 
 class AbacusMixin:
@@ -118,7 +117,7 @@ class AbacusMixin:
 
     def get_abacus_position_ids(self, input_ids, use_cache=None):
         mask = torch.isin(input_ids, self.digits)
-        
+
         if not self.training:
             if use_cache:
                 position_ids = (mask).int() + self.offset * (mask).int()
@@ -128,7 +127,7 @@ class AbacusMixin:
                 self.offset = position_ids[:, -2:-1]
         else:
             position_ids = self.helper(mask, input_ids.device)
-            
+
         k=0
         if self.training:
             k = random.randint(0, self.config.max_k)
@@ -168,10 +167,6 @@ class AbacusLlamaConfig(LlamaConfig, AbacusConfig):
 class AbacusLlamaModel(AbacusMixin, LlamaModel):
     def __init__(self, config: AbacusLlamaConfig):
         super().__init__(config)
-
-    def forward(self, input_ids, *args, labels=None, attention_mask=None, position_ids=None, **kwargs):
-        position_ids = self.get_abacus_position_ids(input_ids)
-        return super().forward(input_ids, position_ids=position_ids, *args, labels=labels, attention_mask=attention_mask, **kwargs)
 
     def forward(
         self,
@@ -232,11 +227,16 @@ class AbacusLlamaModel(AbacusMixin, LlamaModel):
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
-        position_embeddings = self.rotary_emb(hidden_states, position_ids)
+        if self.config.rope_theta == torch.inf:
+            B, L = hidden_states.size()[:2]
+            D = self.config.hidden_size // self.config.num_attention_heads
+            position_embeddings = torch.ones(B, L, D, device=hidden_states.device), torch.zeros(B, L, D, device=hidden_states.device)
+        else:
+            position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
         # Add abacus embeddings
         abacus_embeddings = self.get_abacus_position_ids(input_ids, use_cache=past_key_values is not None and past_key_values.get_seq_length() > 0)
-        hidden_states = hidden_states + abacus_embeddings
+        hidden_states += abacus_embeddings
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None

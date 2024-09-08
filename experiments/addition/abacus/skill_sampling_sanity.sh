@@ -28,11 +28,11 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --do_eval=True \
     --max_steps=25000 \
     --learning_rate=5e-4 \
-    --lr_scheduler_type='warmup_stable_decay' \
-    --lr_scheduler_kwargs='{"num_stable_steps": 20000, "num_decay_steps": 2500}' \
+    --lr_scheduler_type='cosine_with_min_lr' \
+    --lr_scheduler_kwargs='{"min_lr": 1e-6}' \
     --adam_beta2=0.99 \
-    --adam_epsilon=1e-12 \
-    --weight_decay=0.01 \
+    --adam_epsilon=1e-8 \
+    --weight_decay=0.00 \
     --warmup_ratio=0.1 \
     --logging_steps=20 \
     --eval_strategy="steps" \
@@ -40,11 +40,11 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --predict_with_generate \
     --remove_unused_columns=False \
     --eval_on_start=True \
-    --per_device_train_batch_size=320 \
+    --per_device_train_batch_size=640 \
     --per_device_eval_batch_size=1024 \
-    --gradient_accumulation_steps=3 \
+    --gradient_accumulation_steps=4 \
     --include_inputs_for_metrics=True \
     --save_steps=500 \
     --torch_compile=True \
-    --bf16=False \
+    --bf16=True \
     --tf32=True

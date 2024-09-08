@@ -9,7 +9,7 @@ set -e
     # --max_grad_norm=1 \
     # --warmup_ratio=0.1 \
 
-CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
+CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
     --architecture=llama \
     --from_pretrained=False \
     --hidden_size=768 \
@@ -21,14 +21,14 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     \
     --num_train=20000000 \
     --num_eval=100 \
-    --n_digits_train='1,33 1,33 1,17' \
-    --op_train='add add add' \x
-    --format_train='reverse-no-carry reverse-carry-only reverse' \
-    --op_dist_train='1 1 1' \
+    --n_digits_train='1,33 1,17' \
+    --op_train='add add' \
+    --format_train='reverse-carry-only reverse' \
+    --op_dist_train='1 1' \
     --n_digits_eval='4,49,4' \
-    --op_eval='add add add' \
-    --format_eval='reverse-no-carry reverse-carry-only reverse' \
-    --op_dist_eval='1 1 1' \
+    --op_eval='add add' \
+    --format_eval='reverse-carry-only reverse' \
+    --op_dist_eval='1 1' \
     --show_task_ids=True \
     \
     \
@@ -36,14 +36,14 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --output_dir=out \
     --do_train=True \
     --do_eval=True \
-    --max_steps=15000 \
+    --max_steps=10000 \
     --learning_rate=5e-4 \
     --lr_scheduler_type='warmup_stable_decay' \
-    --lr_scheduler_kwargs='{"num_stable_steps": 12000, "num_decay_steps": 1500}' \
+    --lr_scheduler_kwargs='{"num_stable_steps": 8500, "num_decay_steps": 1000}' \
     --adam_beta2=0.98 \
     --adam_epsilon=1e-12 \
     --weight_decay=0.01 \
-    --warmup_ratio=0.1 \
+    --warmup_ratio=0.05 \
     --logging_steps=20 \
     --eval_strategy="steps" \
     --eval_steps=200 \

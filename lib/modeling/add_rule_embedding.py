@@ -1,6 +1,7 @@
 from torch import nn
 import torch
-from transformers import LlamaForCausalLM, LlamaConfig
+from .llama import LlamaForCausalLMWithNoPE
+from transformers import LlamaConfig
 
 class AddRuleEmbedding(nn.Module):
     def __init__(self, embedding: nn.Embedding, add_rules={}):
@@ -18,7 +19,7 @@ class AddRuleEmbedding(nn.Module):
 class LlamaConfigWithAddRules(LlamaConfig):
     add_rules = ''
 
-class LlamaModelWithAddRules(LlamaForCausalLM):
+class LlamaModelWithAddRules(LlamaForCausalLMWithNoPE):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model.embed_tokens = AddRuleEmbedding(self.model.embed_tokens, add_rules=eval(self.config.add_rules))

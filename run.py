@@ -7,6 +7,7 @@ from lib.configs import ScriptArguments, ModelArguments, DataArguments
 from lib.data_utils import get_dpo_dataset, get_train_dataset, get_eval_dataset, PromptAnswerDataCollator
 from lib.eval_utils import compute_metrics
 from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelWithAddRules
+from lib.modeling.llama import LlamaForCausalLMWithNoPE
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
 from lib.trainer_utils import DPOTrainerDefaultEval, Seq2SeqTrainerNoEvalLoss, AddWandbConfigCallback, DPOSeq2SeqConfig
 from lib.modeling.cat import ConvLlamaForCausalLM
@@ -117,7 +118,7 @@ def get_model(model_args: ModelArguments, tokenizer: PreTrainedTokenizer):
                 model_config.k = 256
                 model = LlamaRandPosId(model_config)
             else:
-                model = LlamaForCausalLM(model_config)
+                model = LlamaForCausalLMWithNoPE(model_config)
         elif model_args.architecture == "abacus":
             # model_config = AbacusFalconConfig(
             #     vocab_size=tokenizer.vocab_size,

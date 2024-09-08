@@ -1,4 +1,4 @@
-from random import randint, choice, sample
+from random import randint, choice, sample, shuffle
 
 def split_digits(a, b):
     a_digits = []
@@ -78,7 +78,7 @@ def get_reverse_add_cont(a, b):
 def get_forward(a, b):
     return tuple(map(lambda x: x[::-1], get_reverse(a, b)))
 
-def get_reverse_no_carry(a, b):
+def get_reverse_no_carry(a, b, randomize=False):
     def bin_op(a, b):
         # return chr(ord('a') + (a + b) % 10)
         return str((a + b) % 10)
@@ -87,12 +87,18 @@ def get_reverse_no_carry(a, b):
     b = b[::-1]
     s = ''.join(bin_op(int(ai), int(bi)) for ai, bi in zip(a.ljust(l, '0'), b.ljust(l, '0')))
     s += '0'
-    return f'A{a}+{b}=', s, None
+    
+    if not randomize:
+        return f'A{a}+{b}=', s, None
+    else:
+        s = list(s)
+        s = str(shuffle(s))
+        return f'A{a}+{b}=', s, None
 
 def get_forward_no_carry(a, b):
     return tuple(map(lambda x: x[::-1], get_reverse_no_carry(a, b)))
 
-def get_reverse_carry_only(a, b):
+def get_reverse_carry_only(a, b, randomize=False):
     def bin_op(a, b, prev_c):
         if a + b == 9:
             # return '.' if prev_c else '_', prev_c
@@ -113,7 +119,13 @@ def get_reverse_carry_only(a, b):
     for ai, bi in zip(a.ljust(l, '0'), b.ljust(l, '0')):
         si, prev_c = bin_op(int(ai), int(bi), prev_c) 
         s += si
-    return f'B{a}+{b}=', s, None
+        
+    if not randomize:
+        return f'B{a}+{b}=', s, None
+    else:
+        s = list(s)
+        s = str(shuffle(s))
+        return f'B{a}+{b}=', s, None
 
 def get_forward_carry_only(a, b):
     return tuple(map(lambda x: x[::-1], get_reverse_carry_only(a, b)))
@@ -172,22 +184,22 @@ def get_rot1rev(a):
 
 def get_interleave_copy(a, b):
     a_digits, b_digits, carries = split_digits(int(a), int(b))
-    b_digits = [chr(ord('a') + i) for i in b_digits][::-1]
+    # b_digits = [chr(ord('a') + i) for i in b_digits][::-1]
     a_digits = a_digits[::-1]
     b = ''.join(b_digits)
 
-    prompt = f'{str(a)},{str(b)}A[SEP]'
+    prompt = f'A{str(a)},{str(b)}[SEP]'
     target = ''.join(f'{da}{db}' for da, db in zip(a_digits, b_digits))
 
     return prompt, target, None
 
 def get_reverse_2op(a, b):
-    b = ''.join([chr(ord('a') + int(i)) for i in b])
-    return f'{a},{b}B[SEP]', b[::-1]+','+a[::-1], None
+    # b = ''.join([chr(ord('a') + int(i)) for i in b])
+    return f'B{a},{b}[SEP]', b[::-1]+','+a[::-1], None
 
 def get_itcopy_rev(a, b):
-    prompt, target = get_interleave_copy(a, b)
-    return prompt.replace('A', 'AB'), target[::-1], None
+    prompt, target, _ = get_interleave_copy(a, b)
+    return prompt.replace('A', 'C'), target[::-1], None
     # return prompt.replace('A', 'C'), get_reverse_2op(a, b)[1] + 'A[SEP]' + target[::-1]
 
 def get_sd_mult(a, b):
@@ -220,7 +232,7 @@ def get_cumsum(a):
         s += int(ai)
         s = s % 10
         cot += str(s)
-    return f'{a_rev}A=', cot, None
+    return f'A{a_rev}=', cot, None
 
 def get_gt5(a):
     a_rev = a[::-1]
@@ -230,7 +242,7 @@ def get_gt5(a):
             cot += '1'
         else:
             cot += '0'
-    return f'{a_rev}B=', cot, None
+    return f'B{a_rev}=', cot, None
 
 def get_cumsum_gt5(a):
     a_rev = a[::-1]
@@ -243,4 +255,21 @@ def get_cumsum_gt5(a):
             cot += '1'
         else:
             cot += '0'
-    return f'{a_rev}AB=', cot, None
+    return f'C{a_rev}=', cot, None
+
+def get_3sum(a):
+    s = True
+    for i in range(0, len(a), 3):
+        s = s and (a[i] or a[i+1] or a[i+2])
+    return f'A{a}=', str(int(s)), None
+
+def get_parity(a):
+    s = sum([int(ai) for ai in a]) % 2
+    return f'B{a}=', str(s), None
+
+def get_3parity(a):
+    s = 0
+    for i in range(0, len(a), 3):
+        s = s + int(a[i] or a[i+1] or a[i+2])
+    s = s % 2
+    return f'C{a}=', str(s), None

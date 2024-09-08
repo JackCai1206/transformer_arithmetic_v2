@@ -5,7 +5,7 @@ from typing import List, Tuple
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from .configs import DataArguments
-from .data_formats import get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
+from .data_formats import get_3parity, get_3sum, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
 
 import random
 import numpy as np
@@ -22,8 +22,12 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_COT(a, b)
         elif format == 'reverse-no-carry':
             return get_reverse_no_carry(a, b)
+        elif format == 'reverse-no-carry-random':
+            return get_reverse_no_carry(a, b, randomize=True)
         elif format == 'reverse-carry-only':
             return get_reverse_carry_only(a, b)
+        elif format == 'reverse-carry-only-random':
+            return get_reverse_carry_only(a, b, randomize=True)
         elif format == 'forward':
             return get_forward(a, b)
         elif format == 'forward-no-carry':
@@ -75,6 +79,13 @@ def get_line(a, b, op=None, format=None, train=None):
         return get_gt5(a)
     elif op == 'cumsum_gt5':
         return get_cumsum_gt5(a)
+    elif op == 'boolean':
+        if format == '3sum':
+            return get_3sum(a)
+        elif format == 'parity':
+            return get_parity(a)
+        elif format == '3parity':
+            return get_3parity(a)
 
     raise ValueError(f'Unknown op or format: {op}, {format}')
 
@@ -96,6 +107,10 @@ def data_generator(
             # Generate a random list of digits
             nda = random.randint(*n_digits_a_range)
             a = random.sample(range(100), nda)
+            prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
+        elif op == 'boolean':
+            nda = random.randint(*n_digits_a_range)
+            a = random.sample(range(2), nda)
             prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
         else:
             nda = random.randint(*n_digits_a_range)

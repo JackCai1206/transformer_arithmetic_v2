@@ -92,7 +92,8 @@ def get_reverse_no_carry(a, b, randomize=False):
         return f'A{a}+{b}=', s, None
     else:
         s = list(s)
-        s = str(shuffle(s))
+        shuffle(s)
+        s = ''.join(s)
         return f'A{a}+{b}=', s, None
 
 def get_forward_no_carry(a, b):
@@ -124,7 +125,8 @@ def get_reverse_carry_only(a, b, randomize=False):
         return f'B{a}+{b}=', s, None
     else:
         s = list(s)
-        s = str(shuffle(s))
+        shuffle(s)
+        s = ''.join(s)
         return f'B{a}+{b}=', s, None
 
 def get_forward_carry_only(a, b):

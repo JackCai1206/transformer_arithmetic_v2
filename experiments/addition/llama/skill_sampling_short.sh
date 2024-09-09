@@ -9,7 +9,7 @@ set -e
     # --max_grad_norm=1 \
     # --warmup_ratio=0.1 \
 
-CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
+CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
     --architecture=llama \
     --from_pretrained=False \
     --hidden_size=768 \
@@ -17,11 +17,12 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --num_attention_heads=12 \
     --num_layers=12 \
     --max_position_embeddings=1024 \
+    --rope_theta=1e5 \
     \
     \
     --num_train=20000000 \
     --num_eval=100 \
-    --n_digits_train='1,33 1,33 1,17' \
+    --n_digits_train='1,33 1,33 1,5' \
     --op_train='add add add' \
     --format_train='reverse-no-carry reverse-carry-only reverse' \
     --op_dist_train='1 1 1' \

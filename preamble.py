@@ -201,6 +201,8 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
         train_args.run_name += "-frz-" + model_args.freeze
     if model_args.freeze_except:
         train_args.run_name += "-frzex-" + model_args.freeze_except
+    if model_args.rope_theta != torch.inf:
+        train_args.run_name += f"-rope-{model_args.rope_theta}"
     disp_task = [data_args.format_train[i] if data_args.format_train[i] != 'None' else data_args.op_train[i] for i in range(len(data_args.format_train))]
     train_args.run_name += f'-{disp_task}-digits-{data_args.n_digits_train}'
     translator = str.maketrans('/,', '__', ''.join(set(string.punctuation + string.whitespace) - set('/,_-')))

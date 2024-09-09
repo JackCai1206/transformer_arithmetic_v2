@@ -14,6 +14,7 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --num_attention_heads=12 \
     --num_layers=12 \
     --max_position_embeddings=1024 \
+    --rope_theta=1.5e5 \
     \
     \
     --num_train=20000000 \
@@ -28,15 +29,15 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --op_dist_eval='1' \
     \
     \
-    --resume_from_checkpoint='out/llama-768-12-12-1024-reverse-digits-1_17_/checkpoint-4500' \
+    --resume_from_checkpoint='out/llama-768-12-12-1024-rope-1000000-reverse-digits-1_17_/checkpoint-10000' \
     --run_name='test' \
     --output_dir=out \
-    --do_train=True \
+    --do_train=False \
     --do_eval=True \
-    --max_steps=15000 \
+    --max_steps=10000 \
     --learning_rate=5e-4 \
     --lr_scheduler_type='warmup_stable_decay' \
-    --lr_scheduler_kwargs='{"num_stable_steps": 12000, "num_decay_steps": 1500}' \
+    --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
     --adam_beta2=0.98 \
     --adam_epsilon=1e-12 \
     --weight_decay=0.01 \

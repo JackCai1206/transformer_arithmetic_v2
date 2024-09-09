@@ -27,9 +27,9 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --output_dir=out \
     --do_train=True \
     --do_eval=True \
-    --max_steps=25000 \
+    --max_steps=10000 \
     --lr_scheduler_type='warmup_stable_decay' \
-    --lr_scheduler_kwargs='{"num_stable_steps": 20000, "num_decay_steps": 2500}' \
+    --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
     --adam_beta2=0.99 \
     --weight_decay=0.00 \
     --max_grad_norm=1 \

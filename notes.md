@@ -1,5 +1,4 @@
 ## Addition
-- rope scaling
 - 
 
 # Weaker version
@@ -12,13 +11,10 @@
 - sort
 - mode?
 
-## COT
-- Automata format
-  - kinda works really well?
+## COT "Chain-length generalization"
+- Show that TF can auto-compose the two reasoning steps
+  - maybe even have length generalization inheritance from one task to another
 
 ## Other 
-- Does LG scale with compute
-- curriculum learning
 - backtrack token
 - top p/non greedy decoding/supress eos
-- pad to fixed length

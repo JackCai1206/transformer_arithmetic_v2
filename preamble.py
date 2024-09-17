@@ -1,3 +1,4 @@
+import os
 import re
 import string
 from functools import partial
@@ -9,13 +10,14 @@ from lib.eval_utils import compute_metrics
 from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelWithAddRules
 from lib.modeling.llama import LlamaForCausalLMWithNoPE
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
-from lib.trainer_utils import AddWandbConfigCallback, Seq2SeqTrainerNoEvalLoss
+from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss
 from lib.modeling.cat import ConvLlamaForCausalLM
 from lib.modeling.abacus import AbacusLlamaForCausalLM, AbacusLlamaModel, AbacusLlamaConfig
 from charactertokenizer import CharacterTokenizer
 
 from typing import cast
 from transformers import Seq2SeqTrainingArguments, HfArgumentParser, set_seed, GenerationConfig, AutoModelForCausalLM, AutoConfig, PreTrainedModel, LlamaConfig, LlamaForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, PreTrainedTokenizer
+from transformers.trainer_utils import get_last_checkpoint
 from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 
@@ -118,7 +120,8 @@ def get_model(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, 
                 max_position_embeddings=model_args.max_position_embeddings,
                 _attn_implementation='flash_attention_2' if train_args.bf16 else 'sdpa',
                 # rope_theta=torch.inf
-                rope_theta=model_args.rope_theta
+                rope_theta=model_args.rope_theta,
+                partial_rotary_factor=model_args.partial_rotary_factor
             )
             if model_args.architecture == 'llama-random-pos-id':
                 model_config.k = 256
@@ -147,7 +150,7 @@ def get_model(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, 
                 _attn_implementation='flash_attention_2' if train_args.bf16 else 'eager',
                 digit_tokens=tokenizer.convert_tokens_to_ids(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]),
                 # activation_function='gelu'
-                rope_theta=model_args.rope_theta
+                rope_theta=torch.inf
             )
             model = AbacusLlamaForCausalLM(model_config)
         elif model_args.architecture == "add_rule_embedding":
@@ -159,7 +162,9 @@ def get_model(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, 
                 num_hidden_layers=model_args.num_layers,
                 max_position_embeddings=model_args.max_position_embeddings,
                 _attn_implementation='flash_attention_2' if train_args.bf16 else 'eager',
-                add_rules=str({tuple(tokenizer.convert_tokens_to_ids(['A', 'B'])): tokenizer.convert_tokens_to_ids('C')})
+                add_rules=str({tuple(tokenizer.convert_tokens_to_ids(['A', 'B'])): tokenizer.convert_tokens_to_ids('C')}),
+                rope_theta=model_args.rope_theta,
+                partial_rotary_factor=model_args.partial_rotary_factor
             )
             model = LlamaModelWithAddRules(model_config)
         else:
@@ -212,6 +217,21 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
     train_args.save_safetensors = False # supposed to fix "There were missing keys in the checkpoint model loaded: ['lm_head.weight']."
     train_args.dataloader_num_workers = data_args.nproc
     train_args.remove_unused_columns = False
+    
+    if train_args.resume_from_checkpoint == 'True':
+        # Try finding a checkpoint in the output directory
+        try:
+            train_args.resume_from_checkpoint = get_last_checkpoint(train_args.output_dir)
+        except FileNotFoundError:
+            train_args.resume_from_checkpoint = None
+    else:
+        # Try finding a checkpoint in the provided path
+        try:
+            ckpt_dir = get_last_checkpoint(train_args.resume_from_checkpoint)
+            if ckpt_dir is not None:
+                train_args.resume_from_checkpoint = ckpt_dir
+        except:
+            pass
 
     return train_args
 
@@ -228,5 +248,9 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
 
     AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
     trainer.add_callback(AddConfigCB)
+
+    if train_args.metric_for_best_model is not None:
+        EarlyStoppingCB = EarlyStoppingCallback(metric_name=train_args.metric_for_best_model, threshold=0.99, patience=1)
+        trainer.add_callback(EarlyStoppingCB)
 
     return trainer

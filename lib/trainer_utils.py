@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import partial, reduce
 from datasets import Dataset
-from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback, TrainerControl
 from transformers.integrations import WandbCallback
 from trl import DPOTrainer, DPOConfig
 
@@ -164,6 +164,22 @@ class AddWandbConfigCallback(WandbCallback):
         super().setup(args, state, model, **kwargs)
         new_config = reduce(lambda x, y: {**x, **y}, self.extra_configs)
         self._wandb.config.update(new_config, allow_val_change=True)
+
+class EarlyStoppingCallback(TrainerCallback):
+    def __init__(self, metric_name, threshold, patience):
+        self.patience_counter = patience
+        self.metric_name = metric_name
+        self.threshold = threshold
+        self.patience = patience
+
+    def should_stop(self, state, metrics):
+        if self.metric_name in metrics and metrics[self.metric_name] >= self.threshold:
+            self.patience_counter -= 1
+
+        return self.patience_counter <= 0
+
+    def on_evaluate(self, args, state, control: TrainerControl, model, metrics, **kwargs):
+        control.should_training_stop = self.should_stop(state, metrics)
 
 from transformers import Constraint, LogitsProcessor
 

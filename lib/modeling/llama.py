@@ -69,12 +69,14 @@ class LlamaModelWithNoPE(LlamaModel):
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
-        if self.config.rope_theta == torch.inf:
-            B, L = hidden_states.size()[:2]
-            D = self.config.hidden_size // self.config.num_attention_heads
-            position_embeddings = torch.ones(B, L, D, device=hidden_states.device), torch.zeros(B, L, D, device=hidden_states.device)
-        else:
-            position_embeddings = self.rotary_emb(hidden_states, position_ids)
+        B, L = hidden_states.size()[:2]
+        D = self.config.hidden_size // self.config.num_attention_heads
+        position_embeddings = torch.ones(B, L, D, device=hidden_states.device), torch.zeros(B, L, D, device=hidden_states.device)
+        if self.config.rope_theta != torch.inf:
+            rotary_dim = int(self.config.partial_rotary_factor * D)
+            cos, sin = self.rotary_emb(hidden_states, position_ids)
+            position_embeddings[0][:, :, :rotary_dim+1] = cos
+            position_embeddings[1][:, :, :rotary_dim+1] = sin
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None

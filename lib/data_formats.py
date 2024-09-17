@@ -1,4 +1,4 @@
-from random import randint, choice, sample, shuffle
+from random import randint, choice, sample, shuffle, random
 
 def split_digits(a, b):
     a_digits = []
@@ -44,6 +44,12 @@ def get_COT(a, b):
     #     breakpoint()
     return prompt, cot, None
 
+def get_add1(a):
+    if random() < 0.5:
+        return f'A{a[::-1]}+1=', str(int(a) + 1)[::-1], None
+    else:
+        return f'A1+{a[::-1]}=', str(int(a) + 1)[::-1], None
+
 def get_reverse_add_automata(a, b, type='A'):
     c = 0
     s = '0'
@@ -76,7 +82,8 @@ def get_reverse_add_cont(a, b):
     return f'{a[::-1]}+{b[::-1]}=', s, None
 
 def get_forward(a, b):
-    return tuple(map(lambda x: x[::-1], get_reverse(a, b)))
+    s = str(int(a) + int(b))
+    return f'A{a}+{b}=', s, None
 
 def get_reverse_no_carry(a, b, randomize=False):
     def bin_op(a, b):
@@ -96,8 +103,23 @@ def get_reverse_no_carry(a, b, randomize=False):
         s = ''.join(s)
         return f'A{a}+{b}=', s, None
 
-def get_forward_no_carry(a, b):
-    return tuple(map(lambda x: x[::-1], get_reverse_no_carry(a, b)))
+def get_forward_no_carry(a, b, randomize=False):
+    def bin_op(a, b):
+        # return chr(ord('a') + (a + b) % 10)
+        return str((a + b) % 10)
+    l = max(len(a), len(b))
+    a = a[::-1]
+    b = b[::-1]
+    s = ''.join(bin_op(int(ai), int(bi)) for ai, bi in zip(a.ljust(l, '0'), b.ljust(l, '0')))
+    s += '0'
+    
+    if not randomize:
+        return f'A{a[::-1]}+{b[::-1]}=', s[::-1], None
+    else:
+        s = list(s)
+        shuffle(s)
+        s = ''.join(s)
+        return f'A{a[::-1]}+{b[::-1]}=', s[::-1], None
 
 def get_reverse_carry_only(a, b, randomize=False):
     def bin_op(a, b, prev_c):
@@ -129,8 +151,35 @@ def get_reverse_carry_only(a, b, randomize=False):
         s = ''.join(s)
         return f'B{a}+{b}=', s, None
 
-def get_forward_carry_only(a, b):
-    return tuple(map(lambda x: x[::-1], get_reverse_carry_only(a, b)))
+def get_forward_carry_only(a, b, randomize=False):
+    def bin_op(a, b, prev_c):
+        if a + b == 9:
+            # return '.' if prev_c else '_', prev_c
+            return '1' if prev_c else '0', prev_c
+        elif a + b > 9:
+            prev_c = True
+            return '1', prev_c
+            # return '.', prev_c
+        else: # a + b < 9
+            prev_c = False
+            return '0', prev_c
+            # return '_', prev_c
+    l = max(len(a), len(b))
+    a = a[::-1]
+    b = b[::-1]
+    s = '0'
+    prev_c = False
+    for ai, bi in zip(a.ljust(l, '0'), b.ljust(l, '0')):
+        si, prev_c = bin_op(int(ai), int(bi), prev_c) 
+        s += si
+        
+    if not randomize:
+        return f'B{a[::-1]}+{b[::-1]}=', s[::-1], None
+    else:
+        s = list(s)
+        shuffle(s)
+        s = ''.join(s)
+        return f'B{a[::-1]}+{b[::-1]}=', s[::-1], None
 
 def get_nar(a, n=5):
     i = randint(0, len(a) - n)
@@ -139,9 +188,6 @@ def get_nar(a, n=5):
     target = a[i+n-1]
     
     return prompt, target, None
-
-def get_copy(a):
-    return f'{a}[SEP]', a, None
 
 def get_sort(a, reverse=False):
     x = []
@@ -259,19 +305,37 @@ def get_cumsum_gt5(a):
             cot += '0'
     return f'C{a_rev}=', cot, None
 
+def get_copy(a):
+    return f'D{a}=', a, None
+
 def get_3sum(a):
-    s = True
-    for i in range(0, len(a), 3):
-        s = s and (a[i] or a[i+1] or a[i+2])
-    return f'A{a}=', str(int(s)), None
+    s = ''
+    for i in range(0, len(a), 2):
+        s += str(a[i] or a[i+1])
+    a_str = ''.join(map(str, a))
+    return f'A{a_str}=', s, None
 
 def get_parity(a):
-    s = sum([int(ai) for ai in a]) % 2
-    return f'B{a}=', str(s), None
+    # s = sum(a)
+    # a_str = ''.join(map(str, a))
+    # return f'B{a_str}=', str(s), None
+    s = ''
+    for i in range(0, len(a), 2):
+        s += str(a[i] and a[i+1])
+    a_str = ''.join(map(str, a))
+    return f'B{a_str}=', s, None
 
 def get_3parity(a):
-    s = 0
-    for i in range(0, len(a), 3):
-        s = s + int(a[i] or a[i+1] or a[i+2])
-    s = s % 2
-    return f'C{a}=', str(s), None
+    # s = 0
+    # for i in range(0, len(a), 3):
+    #     s = s + int(a[i] or a[i+1] or a[i+2])
+    # # s = s % 2
+    # a_str = ''.join(map(str, a))
+    # return f'C{a_str}=', str(s), None
+    or_str = get_3sum(a)[1]
+    and_str = get_parity(a)[1]
+    s = ''
+    for ai, bi in zip(or_str, and_str):
+        s += str((int(ai) + int(bi)) % 2)
+    a_str = ''.join(map(str, a))
+    return f'C{a_str}=', s, None

@@ -16,6 +16,7 @@ class ModelArguments:
     use_lora: bool = False
     architecture: Optional[str] = 'mamba'
     rope_theta: Optional[float] = np.inf
+    partial_rotary_factor: Optional[float] = 1.0
     hidden_size: Optional[int] = 768
     intermediate_size: Optional[int] = 3072
     num_attention_heads: Optional[int] = 12

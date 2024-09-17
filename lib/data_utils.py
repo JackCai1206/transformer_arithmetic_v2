@@ -5,7 +5,7 @@ from typing import List, Tuple
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from .configs import DataArguments
-from .data_formats import get_3parity, get_3sum, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
+from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
 
 import random
 import numpy as np
@@ -42,6 +42,8 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_reverse_add_automata(a, b, type='B')
         elif format == 'automata_C':
             return get_reverse_add_automata(a, b, type='C')
+        elif format == 'add1':
+            return get_add1(a)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)
@@ -105,21 +107,21 @@ def data_generator(
     for _ in shard[0]:
         if op == 'sort':
             # Generate a random list of digits
-            nda = random.randint(*n_digits_a_range)
+            nda = random.sample(range(*n_digits_a_range), 1)[0]
             a = random.sample(range(100), nda)
             prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
         elif op == 'boolean':
-            nda = random.randint(*n_digits_a_range)
-            a = random.sample(range(2), nda)
+            nda = random.sample(range(*n_digits_a_range), 1)[0]
+            a = [random.randint(0, 1) for _ in range(nda)]
             prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
         else:
-            nda = random.randint(*n_digits_a_range)
+            nda = random.sample(range(*n_digits_a_range), 1)[0]
             if op == 'mult':
                 ndb = 2 # always 3 digits for b
             elif op == 'add' and 'automata' in format:
                 ndb = nda
             else:
-                ndb = random.randint(*n_digits_b_range)
+                ndb = random.sample(range(*n_digits_a_range), 1)[0]
             a = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(nda - 1)])
             b = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(ndb - 1)])
             prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
@@ -224,13 +226,13 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     # l = []
     print('----------- Examples from train: -------------')
-    for example in itertools.islice(ds, 0, 100):
+    for example in itertools.islice(ds, 0, 1):
         print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
         print(example['labels'])
         print(tokenizer.decode(example['labels']))
-        # l.append(len(example['input_ids']))
-        
+    #     l.append(len(example['input_ids']))
+
     # import matplotlib.pyplot as plt
     # plt.hist(l, bins=100)
     # plt.savefig('train_hist.png')
@@ -248,7 +250,9 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
 
     def tokenization(batch):
         batch_new = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False, return_token_type_ids=False)
-        batch_new['eval_labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
+        batch_new['labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
+        for k in batch_new.keys():
+            batch_new['eval_' + k] = batch_new.pop(k)
         return batch_new
 
     ds_list = {}
@@ -260,7 +264,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                     'train': False, 
                     'op': args.op_eval[opi],
                     'format': args.format_eval[opi],
-                    'n_digits_a_range': (n_digits, n_digits),
+                    'n_digits_a_range': (n_digits, n_digits + 1),
                     'shard': [range(round(args.num_eval * frac))],
                     'show_task_ids': args.show_task_ids
                 },
@@ -275,8 +279,8 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():
         for example in itertools.islice(ds, 0, 2):
-            print(example['input_ids'])
-            print(tokenizer.decode(example['input_ids']))
+            print(example['eval_input_ids'])
+            print(tokenizer.decode(example['eval_input_ids']))
             print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
 
@@ -309,7 +313,10 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     return ds
 
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
-    left_pad_list: tuple = ('prompt', 'input_ids', 'labels', 'attention_mask')
+    # Right pad during training, left pad during eval
+    # because during training the position ids starts at the left-most token
+    # The other option is to left pad everything and manually cauculate training position ids, but this should be simpler
+    left_pad_list: tuple = ('prompt', 'eval_input_ids', 'eval_labels', 'eval_attention_mask')
 
     def __call__(self, features):
         # convert to dict of lists and pop the labels
@@ -340,8 +347,9 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
             else:
                 raise ValueError(f"Unexpected key in batch '{k}'")
             
-            if k == 'eval_labels':
-                input_k = 'labels'
+            # remove the eval_ prefix to conform to model input names
+            if 'eval_' in k:
+                input_k = k.replace('eval_', '')
             else:
                 input_k = k
 
@@ -357,5 +365,4 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         #     else:
         #         batch['attention_mask'] = torch.stack(attention_mask, dim=0)
         #         # batch['attention_mask'] = (~batch['attention_mask']).float() * torch.finfo(torch.float32).min # not compatible with bf16
-
         return padded_batch

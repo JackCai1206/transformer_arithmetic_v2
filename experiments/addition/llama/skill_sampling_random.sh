@@ -20,7 +20,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     \
     \
     --num_train=20000000 \
-    --num_eval=100 \
+    --num_eval=1000 \
     --n_digits_train='1,33 1,33 1,17' \
     --op_train='add add add' \
     --format_train='reverse-no-carry-random reverse-carry-only reverse' \
@@ -70,7 +70,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     \
     \
     --num_train=20000000 \
-    --num_eval=100 \
+    --num_eval=1000 \
     --n_digits_train='1,33 1,33 1,17' \
     --op_train='add add add' \
     --format_train='reverse-no-carry reverse-carry-only-random reverse' \

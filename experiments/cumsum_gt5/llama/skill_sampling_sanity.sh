@@ -20,7 +20,7 @@ for from_pretrained use_lora max_steps eval_steps in \
         \
         \
         --num_train=20000000 \
-        --num_eval=100 \
+        --num_eval=1000 \
         --n_digits_train='1,13' \
         --op_train='cumsum_gt5' \
         --format_train='None' \

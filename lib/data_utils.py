@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import itertools
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -96,7 +96,7 @@ def data_generator(
     format: str,
     show_task_ids: bool, 
     n_digits_a_range: Tuple[int] = None,
-    n_digits_b_range: Tuple[int] | None = None,
+    n_digits_b_range: Union[Tuple[int], None] = None, # Use Union for Python < 3.10 Tuple[int] | None = None,
     train: bool = True,
     shard: List[int] = None,
 ):
@@ -305,7 +305,8 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
             'op': args.op_train[0],
             'format': args.format_train[0],
             'n_digits_a_range': args.n_digits_train[0],
-            'shard': [range(i * round((args.num_train * 1) // args.nproc), (i + 1) * round((args.num_train * 1) // args.nproc)) for i in range(args.nproc)]
+            'shard': [range(i * round((args.num_train * 1) // args.nproc), (i + 1) * round((args.num_train * 1) // args.nproc)) for i in range(args.nproc)],
+            'show_task_ids': args.show_task_ids
         },
     ) \
     .map(get_dpo_format, batched=True, batch_size=1000, remove_columns=['target'])

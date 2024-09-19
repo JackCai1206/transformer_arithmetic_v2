@@ -14,8 +14,8 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --num_attention_heads=12 \
     --num_layers=12 \
     --max_position_embeddings=1024 \
-    --rope_theta=1e5 \
-    --partial_rotary_factor=1 \
+    --rope_theta=1e3 \
+    --partial_rotary_factor=0.125 \
     \
     \
     --num_train=20000000 \

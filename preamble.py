@@ -28,6 +28,8 @@ def get_args():
     train_args = cast(Seq2SeqTrainingArguments, train_args)
     data_args = cast(DataArguments, data_args)
     data_args.block_size = model_args.max_position_embeddings
+    if model_args.rope_theta == 'Inf': 
+        model_args.rope_theta = torch.inf
 
     set_seed(train_args.seed)
     return args, model_args, data_args, train_args
@@ -150,7 +152,7 @@ def get_model(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, 
                 _attn_implementation='flash_attention_2' if train_args.bf16 else 'eager',
                 digit_tokens=tokenizer.convert_tokens_to_ids(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]),
                 # activation_function='gelu'
-                rope_theta=torch.inf
+                rope_theta=model_args.rope_theta,
             )
             model = AbacusLlamaForCausalLM(model_config)
         elif model_args.architecture == "add_rule_embedding":

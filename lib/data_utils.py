@@ -324,8 +324,18 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         features = {
             key: [example[key] for example in features] for key in features[0].keys()
         }
+        # print(f"Features: {features.keys()}")  # Debugging line
+        # dict_keys(['loss_mask', 'input_ids', 'attention_mask', 'eval_labels']) 
+        # or dict_keys(['prompt', 'loss_mask', 'chosen', 'rejected', 'chosen_input_ids', 'chosen_attention_mask', 'chosen_labels', 'rejected_input_ids', 'rejected_attention_mask', 'rejected_labels', 'prompt_input_ids', 'prompt_token_type_ids', 'prompt_attention_mask'])
         padded_batch = {}
         for k, feat in features.items():
+            # print(f"Processing feature (k): {k}, feat[0]: {feat[0]}, len: {len(feat[0])}")  # Debugging line
+
+            if isinstance(feat[0], str): # Check if the feature is a string (-> prompt, chosen, rejected)
+                # print(f"feat is a string: {feat[0]}")  # Debugging line
+                # padded_batch[k] = feat
+                continue
+
             if k in self.left_pad_list:
                 to_pad = [torch.LongTensor(ex[::-1]) for ex in feat]
             else:
@@ -345,6 +355,9 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 padding_value = 0
             elif k.endswith('loss_mask'):
                 padding_value = 0
+            elif k == 'prompt_token_type_ids': # this one seems to be missing
+                # padding_value = 0
+                continue
             else:
                 raise ValueError(f"Unexpected key in batch '{k}'")
             
@@ -358,6 +371,8 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
 
             if k in self.left_pad_list:
                 padded_batch[input_k] = padded_batch[input_k].flip(dims=[1])
+
+        # print(f"Padded batch: {input_k}, padded_batch[input_k][0]: {padded_batch[input_k][0]}, len: {len(padded_batch[input_k][0])}") # Debugging line
 
         # add in 4D attention mask, workaround for https://github.com/huggingface/transformers/issues/32101
         # if attention_mask is not None:

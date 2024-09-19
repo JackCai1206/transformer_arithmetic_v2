@@ -75,8 +75,8 @@ class LlamaModelWithNoPE(LlamaModel):
         if self.config.rope_theta != torch.inf:
             rotary_dim = int(self.config.partial_rotary_factor * D)
             cos, sin = self.rotary_emb(hidden_states, position_ids)
-            position_embeddings[0][:, :, :rotary_dim+1] = cos
-            position_embeddings[1][:, :, :rotary_dim+1] = sin
+            position_embeddings[0][:, :, :rotary_dim] = cos
+            position_embeddings[1][:, :, :rotary_dim] = sin
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None

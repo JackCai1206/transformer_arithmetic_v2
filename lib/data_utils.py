@@ -152,10 +152,11 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     def tokenization(batch):
         batch_new = {}
-        prompt_ids = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False)['input_ids']
-        target_ids = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
-        batch_new['input_ids'] = [p + t for p, t in zip(prompt_ids, target_ids)]
-        batch_new['labels'] = [[-100] * (len(p)) + mask_target(t, m) for p, t, m in zip(prompt_ids, target_ids, batch['loss_mask'])]
+        prompt_ids = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False)
+        target_ids = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)
+        batch_new['input_ids'] = [p + t for p, t in zip(prompt_ids['input_ids'], target_ids['input_ids'])]
+        batch_new['labels'] = [[-100] * (len(p)) + mask_target(t, m) for p, t, m in zip(prompt_ids['input_ids'], target_ids['input_ids'], batch['loss_mask'])]
+        batch_new['attention_mask'] = [p + t for p, t in zip(prompt_ids['attention_mask'], target_ids['attention_mask'])]
         # batch_new['labels'] = [p + t for p, t in zip(prompt_ids, target_ids)]
         # batch_new['example_ids'] = [[i] * len(p + t) for i, (p, t) in enumerate(zip(prompt_ids, target_ids))]
         return batch_new
@@ -313,16 +314,31 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     return ds
 
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
-    # Right pad during training, left pad during eval
+    # Right pad everything during training, left pad input and attn mask and right pad labels during eval
     # because during training the position ids starts at the left-most token
     # The other option is to left pad everything and manually cauculate training position ids, but this should be simpler
-    left_pad_list: tuple = ('prompt', 'eval_input_ids', 'eval_labels', 'eval_attention_mask')
+    left_pad_list: tuple = ('prompt', 'eval_input_ids', 'eval_attention_mask', 'input_ids', 'attention_mask', 'labels')
+    rand_pad_list: tuple = ()
+    
+    # def get_rand_pad(self, features):
+    #     key = self.rand_pad_list[0]
+    #     if key in features:
+    #         feat = features[key]
+    #         max_len = max([len(ex) for ex in feat])
+    #         pad_amt = [max_len - len(ex) for ex in feat]
+    #         # self.rand_pad_amt = [random.randint(0, pad) for pad in pad_amt]
+    #         self.rand_pad_amt = [pad for pad in pad_amt]
+    #     else:
+    #         self.rand_pad_amt = None
 
     def __call__(self, features):
         # convert to dict of lists and pop the labels
         features = {
             key: [example[key] for example in features] for key in features[0].keys()
         }
+
+        # self.get_rand_pad(features)
+
         padded_batch = {}
         for k, feat in features.items():
             if k in self.left_pad_list:
@@ -354,6 +370,13 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 input_k = k
 
             padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
+            # max_len = max([len(ex) for ex in to_pad])
+            # pad_amt = [max_len - len(ex) for ex in to_pad]
+            # if k in self.rand_pad_list:
+            #     left_pad = self.rand_pad_amt
+            # else:
+            #     left_pad = [0] * len(to_pad)
+            # padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
 
             if k in self.left_pad_list:
                 padded_batch[input_k] = padded_batch[input_k].flip(dims=[1])
@@ -365,4 +388,11 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         #     else:
         #         batch['attention_mask'] = torch.stack(attention_mask, dim=0)
         #         # batch['attention_mask'] = (~batch['attention_mask']).float() * torch.finfo(torch.float32).min # not compatible with bf16
+        
+        # print(features.keys())
+        # print(padded_batch.keys())
+        # print(padded_batch['input_ids'][0:2])
+        # print(padded_batch['attention_mask'][0:2])
+        # print(padded_batch['labels'][0:2])
+        # breakpoint()
         return padded_batch

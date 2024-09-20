@@ -1,18 +1,15 @@
 set -e
     # 16  800 2  \
-    # 32  400 2  \
-    # 64  200 4  \
-    # 128 100 8  \
-    # 256 50  16 \
+    # 32  400 1024 2  \
+    # 64  200 512  4  \
+    # 128 100 256  8  \
+    # 256 50  128  16 \
 
-for train_low in 4 8 16; do
+for train_low in 8 6 4; do
     for train_high batch_size eval_batch_size grad_acc in \
-        32  400 1024 2  \
-        64  200 512  4  \
-        128 100 256  8  \
-        256 50  128  16 \
+        16  800 1024 2  \
     ; do
-        for rope_theta in Inf 1e3; do
+        for rope_theta in 1e5 Inf; do
             for do_train num_eval in \
                 True 128 \
                 False 10000 \
@@ -47,10 +44,10 @@ for train_low in 4 8 16; do
                     --output_dir=out \
                     --do_train=$do_train \
                     --do_eval=True \
-                    --max_steps=10000 \
+                    --max_steps=5000 \
                     --learning_rate=5e-4 \
                     --lr_scheduler_type='warmup_stable_decay' \
-                    --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
+                    --lr_scheduler_kwargs='{"num_stable_steps": 3000, "num_decay_steps": 2000}' \
                     --adam_beta2=0.98 \
                     --adam_epsilon=1e-12 \
                     --weight_decay=0.01 \

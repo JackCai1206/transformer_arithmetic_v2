@@ -13,12 +13,12 @@ for format in \
     'reverse-no-carry' \
     'reverse-carry-only' \
 ; do
-    for rope_theta in Inf 1e3; do
+    for rope_theta in 1e5; do
         for do_train num_eval in \
             True 128 \
             False 10000 \
         ; do
-        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=1_p WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
             --architecture=llama \
             --from_pretrained=False \
             --hidden_size=768 \
@@ -29,7 +29,7 @@ for format in \
             \
             \
             --num_train=20000000 \
-            --num_eval=1000 \
+            --num_eval=$num_eval \
             --n_digits_train='1,33 1,17' \
             --op_train='add add' \
             --format_train=$format' reverse' \
@@ -41,16 +41,18 @@ for format in \
             --show_task_ids=True \
             \
             \
-            --run_name='test' \
+            --resume_from_checkpoint=True \
+            --save_total_limit=1 \
+            --run_name='ablation' \
             --output_dir=out \
-            --do_train=True \
+            --do_train=$do_train \
             --do_eval=True \
             --max_steps=10000 \
             --learning_rate=5e-4 \
             --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
+            --lr_scheduler_kwargs='{"num_stable_steps": 7000, "num_decay_steps": 2000}' \
             --adam_beta2=0.98 \
-            --adam_epsilon=1e-12 \
+            --adam_epsilon=1e-8 \
             --weight_decay=0.01 \
             --warmup_ratio=0.1 \
             --logging_steps=20 \
@@ -58,10 +60,10 @@ for format in \
             --eval_steps=200 \
             --predict_with_generate \
             --remove_unused_columns=False \
-            --eval_on_start=True \
+            --eval_on_start=False \
             --per_device_train_batch_size=400 \
             --per_device_eval_batch_size=1024 \
-            --gradient_accumulation_steps=2 \
+            --gradient_accumulation_steps=3 \
             --include_inputs_for_metrics=True \
             --save_steps=500 \
             --torch_compile=True \

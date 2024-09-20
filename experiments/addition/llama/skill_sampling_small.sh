@@ -14,16 +14,15 @@ for rope_theta in 1e5; do
         True 1024 \
         False 10000 \
     ; do
-    CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
+    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=disabled python run.py \
         --architecture=llama \
         --from_pretrained=False \
-        --hidden_size=768 \
+        --hidden_size=384 \
         --intermediate_size=1536 \
-        --num_attention_heads=12 \
-        --num_layers=12 \
+        --num_attention_heads=6 \
+        --num_layers=6 \
         --max_position_embeddings=1024 \
         --rope_theta=$rope_theta \
-        --partial_rotary_factor=0.125 \
         \
         \
         --num_train=20000000 \
@@ -40,7 +39,7 @@ for rope_theta in 1e5; do
         \
         \
         --save_total_limit=1 \
-        --run_name='base' \
+        --run_name='small' \
         --output_dir=out \
         --do_train=$do_train \
         --do_eval=True \
@@ -58,13 +57,13 @@ for rope_theta in 1e5; do
         --predict_with_generate \
         --remove_unused_columns=False \
         --eval_on_start=False \
-        --per_device_train_batch_size=400 \
+        --per_device_train_batch_size=512 \
         --per_device_eval_batch_size=1024 \
-        --gradient_accumulation_steps=3 \
+        --gradient_accumulation_steps=4 \
         --include_inputs_for_metrics=True \
         --save_steps=500 \
         --torch_compile=True \
-        --bf16=True \
+        --bf16=False \
         --tf32=True
     done
 done

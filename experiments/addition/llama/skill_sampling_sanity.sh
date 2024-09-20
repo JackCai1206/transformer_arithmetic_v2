@@ -6,7 +6,7 @@ set -e
 #     True True 1000 100 \
 #     False False 1000 100 \
 # ; do
-for rope_theta in Inf 1e3; do
+for rope_theta in 1e3 Inf; do
     for do_train num_eval in \
         True 128 \
         False 10000 \
@@ -22,8 +22,10 @@ for rope_theta in Inf 1e3; do
         --rope_theta=$rope_theta \
         \
         \
+        --resume_from_checkpoint=True \
+        --save_total_limit=1 \
         --num_train=20000000 \
-        --num_eval=1000 \
+        --num_eval=$num_eval \
         --n_digits_train='1,17' \
         --op_train='add' \
         --format_train='reverse' \
@@ -38,7 +40,7 @@ for rope_theta in Inf 1e3; do
         --run_name='test' \
         --output_dir=out \
         --do_train=False \
-        --do_eval=True \
+        --do_eval=$do_train \
         --max_steps=10000 \
         --learning_rate=5e-4 \
         --lr_scheduler_type='warmup_stable_decay' \

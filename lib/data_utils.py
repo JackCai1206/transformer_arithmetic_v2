@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import itertools
+import os
 from typing import List, Tuple
 
 import torch
@@ -9,7 +10,7 @@ from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum,
 
 import random
 import numpy as np
-from datasets import IterableDataset, Dataset, interleave_datasets
+from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
@@ -99,19 +100,23 @@ def data_generator(
     n_digits_b_range: Tuple[int] | None = None,
     train: bool = True,
     shard: List[int] = None,
+    no_sample_set: set = None
 ):
     if n_digits_b_range is None:
         n_digits_b_range = n_digits_a_range
 
-    assert len(shard) == 1
+    assert len(shard) == 1, f'Shard should be a list of one range, but got: {shard}'
+    no_sample_hit = 0
     for _ in shard[0]:
         if op == 'sort':
             # Generate a random list of digits
             nda = random.sample(range(*n_digits_a_range), 1)[0]
+            ndb = None
             a = random.sample(range(100), nda)
             prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
         elif op == 'boolean':
             nda = random.sample(range(*n_digits_a_range), 1)[0]
+            ndb = None
             a = [random.randint(0, 1) for _ in range(nda)]
             prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
         else:
@@ -124,6 +129,11 @@ def data_generator(
                 ndb = random.sample(range(*n_digits_a_range), 1)[0]
             a = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(nda - 1)])
             b = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(ndb - 1)])
+            if no_sample_set is not None and (a, b) in no_sample_set:
+                no_sample_hit += 1
+                if no_sample_hit > 100:
+                    raise ValueError(f'No sample hit {no_sample_hit} times')
+                continue
             prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
             if not show_task_ids: 
                 prompt = prompt[:-2] + prompt[-1]
@@ -135,11 +145,13 @@ def data_generator(
             'prompt': prompt,
             'target': target,
             'loss_mask': loss_mask,
+            'n_digits': (nda, ndb)
         }
 
+def get_dataset_display_name(n_digits, op, format):
+    return f'{n_digits}-{op}-{format}'
 
-
-def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer, no_sample_from: dict[str, Dataset]=None):
     def add_special_tokens(batch, add_eos=True):
         batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
         if add_eos:
@@ -199,6 +211,18 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         # attn_mask = (~attn_mask).float() * torch.finfo(torch.float32).min # not compatible with bf16
         # examples['attention_mask'] = attn_mask[None, ... ]
         return examples
+    
+    for key in no_sample_from:
+        no_sample_from[key] = no_sample_from[key].to_dict()
+
+    def filter_eval(example, op=None, format=None):
+        if example['n_digits'][0] != example['n_digits'][1]:
+            # We don't sample asymmetric examples in test, so these are definitely good
+            return True
+        key = get_dataset_display_name(example['n_digits'][0], op, format)
+        if key not in no_sample_from:
+            return True
+        return no_sample_from[key]['prompt'] != example['prompt']
 
     ds_list = []
     for opi, frac in enumerate(args.op_dist_train):
@@ -213,8 +237,9 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
                 'show_task_ids': args.show_task_ids
             },
         )
+        ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]})
         ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
-        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask'])
+        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask', 'n_digits'])
         ds_list.append(ds)
 
     op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]
@@ -257,35 +282,46 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
         return batch_new
 
     ds_list = {}
+    unmapped_ds_list = {}
     for n_digits in range(*args.n_digits_eval):
         for opi, frac in enumerate(args.op_dist_eval):
-            ds = IterableDataset.from_generator(
-                data_generator,
-                gen_kwargs={
-                    'train': False, 
-                    'op': args.op_eval[opi],
-                    'format': args.format_eval[opi],
-                    'n_digits_a_range': (n_digits, n_digits + 1),
-                    'shard': [range(round(args.num_eval * frac))],
-                    'show_task_ids': args.show_task_ids
-                },
-            )
-            ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
-            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target'])
+            os.makedirs(args.eval_samples_file, exist_ok=True)
+            eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{args.num_eval}-{train_args.seed}')
+            if os.path.exists(eval_file):
+                ds0 = Dataset.load_from_disk(eval_file)
+            else:
+                ds0 = Dataset.from_generator(
+                    data_generator,
+                    gen_kwargs={
+                        'train': False, 
+                        'op': args.op_eval[opi],
+                        'format': args.format_eval[opi],
+                        'n_digits_a_range': (n_digits, n_digits + 1),
+                        'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
+                        'show_task_ids': args.show_task_ids,
+                    },
+                    num_proc=args.nproc
+                )
+                for f in ds0.cache_files:
+                    os.remove(f['filename'])
+                ds0.save_to_disk(eval_file)
+            ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
+            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits'])
 
-            key = f'{n_digits}-{args.op_eval[opi]}-{args.format_eval[opi]}'
-            ds_list[key] = ds            
+            key = get_dataset_display_name(n_digits, args.op_eval[opi], args.format_eval[opi])
+            ds_list[key] = ds
+            unmapped_ds_list[key] = ds0
             # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():
-        for example in itertools.islice(ds, 0, 2):
+        for example in ds.take(2):
             print(example['eval_input_ids'])
             print(tokenizer.decode(example['eval_input_ids']))
             print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
 
-    return ds_list
+    return ds_list, unmapped_ds_list
 
 def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     def rand_trunc(l):
@@ -314,9 +350,6 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     return ds
 
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
-    # Right pad everything during training, left pad input and attn mask and right pad labels during eval
-    # because during training the position ids starts at the left-most token
-    # The other option is to left pad everything and manually cauculate training position ids, but this should be simpler
     left_pad_list: tuple = ('prompt', 'eval_input_ids', 'eval_attention_mask', 'input_ids', 'attention_mask', 'labels')
     rand_pad_list: tuple = ()
     

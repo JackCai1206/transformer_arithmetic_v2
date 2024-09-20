@@ -34,6 +34,7 @@ class ModelArguments:
 class DataArguments:
     num_train: int = 20_000_000
     num_eval: int = 100
+    eval_samples_file: str = 'data'
     num_dpo_data: int = 10000
     n_digits_train: Optional[Union[Tuple[Tuple[int]], str]] = '1,20'
     n_digits_eval: Optional[Union[Tuple[int], str]] = '15,30,5'
@@ -43,7 +44,7 @@ class DataArguments:
     op_eval: Optional[Union[Tuple[str], str]] = 'add'
     op_dist_train: Optional[Union[Tuple[float], str]] = '1'
     op_dist_eval: Optional[Union[Tuple[float], str]] = '1'
-    nproc: int = 16
+    nproc: int = 8
     format_train: Optional[Union[Tuple[str], str]] = 'reverse'
     format_eval: Optional[Union[Tuple[str], str]] = 'reverse'
     add_special_tokens: bool = True

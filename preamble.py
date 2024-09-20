@@ -48,10 +48,10 @@ def get_tokenizer(model_args: ModelArguments, data_args: DataArguments):
 
 def get_all_datasets(train_args: Seq2SeqTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
     train_dataset, eval_datasets = None, None
-    if train_args.do_train:
-        train_dataset = get_train_dataset(train_args, data_args, tokenizer)
     if train_args.do_eval:
-        eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
+        eval_datasets, unmapped_eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
+    if train_args.do_train:
+        train_dataset = get_train_dataset(train_args, data_args, tokenizer, no_sample_from=unmapped_eval_datasets)
     tokenizer.padding_side = 'left' # in case it was changed by the data generator
     return train_dataset, eval_datasets
 
@@ -199,7 +199,7 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
         # forced_eos_token_id=tokenizer.eos_token_id
     )
 
-    train_args.run_name = f"{model_args.model_id}"
+    train_args.run_name += f"-{model_args.model_id}"
     if model_args.from_pretrained:
         train_args.run_name += "-pretrained"
     if model_args.use_lora:
@@ -209,7 +209,7 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
     if model_args.freeze_except:
         train_args.run_name += "-frzex-" + model_args.freeze_except
     if model_args.rope_theta != torch.inf:
-        train_args.run_name += f"-rope-{model_args.rope_theta}"
+        train_args.run_name += f"-rope"
     disp_task = [data_args.format_train[i] if data_args.format_train[i] != 'None' else data_args.op_train[i] for i in range(len(data_args.format_train))]
     train_args.run_name += f'-{disp_task}-digits-{data_args.n_digits_train}'
     translator = str.maketrans('/,', '__', ''.join(set(string.punctuation + string.whitespace) - set('/,_-')))

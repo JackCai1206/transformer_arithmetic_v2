@@ -286,7 +286,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
     for n_digits in range(*args.n_digits_eval):
         for opi, frac in enumerate(args.op_dist_eval):
             os.makedirs(args.eval_samples_file, exist_ok=True)
-            eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{args.num_eval}-{train_args.seed}')
+            eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}-{train_args.seed}')
             if os.path.exists(eval_file):
                 ds0 = Dataset.load_from_disk(eval_file)
             else:

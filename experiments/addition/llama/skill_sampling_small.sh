@@ -14,7 +14,7 @@ for rope_theta in 1e5; do
         True 1024 \
         False 10000 \
     ; do
-    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=disabled python run.py \
+    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
         --architecture=llama \
         --from_pretrained=False \
         --hidden_size=384 \

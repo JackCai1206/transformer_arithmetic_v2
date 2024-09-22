@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from functools import partial, reduce
 from datasets import Dataset
-from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback, TrainerControl
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback, TrainerControl, TrainerState
 from transformers.integrations import WandbCallback
+from transformers.training_args import TrainingArguments
 from trl import DPOTrainer, DPOConfig
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -178,8 +179,13 @@ class EarlyStoppingCallback(TrainerCallback):
 
         return self.patience_counter <= 0
 
-    def on_evaluate(self, args, state, control: TrainerControl, model, metrics, **kwargs):
+    def on_evaluate(self, args, state: TrainerState, control: TrainerControl, model, metrics, **kwargs):
         control.should_training_stop = self.should_stop(state, metrics)
+    
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        if state.total_flos >= 511_920_053_762_457_600:
+            control.should_training_stop = True
+            control.should_evaluate = True
 
 from transformers import Constraint, LogitsProcessor
 

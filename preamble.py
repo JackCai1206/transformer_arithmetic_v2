@@ -226,6 +226,8 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
             train_args.resume_from_checkpoint = get_last_checkpoint(train_args.output_dir)
         except FileNotFoundError:
             train_args.resume_from_checkpoint = None
+    elif train_args.resume_from_checkpoint == 'False':
+        train_args.resume_from_checkpoint = None
     else:
         # Try finding a checkpoint in the provided path
         try:
@@ -234,6 +236,11 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
                 train_args.resume_from_checkpoint = ckpt_dir
         except:
             pass
+    
+    train_args.run_name += f'-seed-{train_args.seed}'
+    
+    if not train_args.do_train:
+        train_args.run_name += '-eval'
 
     return train_args
 

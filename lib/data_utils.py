@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import itertools
 import os
+import shutil
 from typing import List, Tuple
 
 import torch
@@ -226,7 +227,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     ds_list = []
     for opi, frac in enumerate(args.op_dist_train):
-        ds = IterableDataset.from_generator(
+        ds = Dataset.from_generator(
             data_generator,
             gen_kwargs={
                 'train': True,
@@ -236,14 +237,16 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
                 'shard': [range(i * round((args.num_train * frac) // args.nproc), (i + 1) * round((args.num_train * frac) // args.nproc)) for i in range(args.nproc)],
                 'show_task_ids': args.show_task_ids
             },
+            num_proc=args.nproc,
         )
-        ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]})
-        ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
-        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask', 'n_digits'])
+        ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]}, num_proc=args.nproc)
+        ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, num_proc=args.nproc)
+        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask', 'n_digits'], num_proc=args.nproc)
+        ds = ds.to_iterable_dataset(num_shards=args.nproc)
         ds_list.append(ds)
 
     op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]
-    ds = interleave_datasets(ds_list, probabilities=op_dist_train).shuffle(train_args.seed)
+    ds = interleave_datasets(ds_list, probabilities=op_dist_train, seed=train_args.seed)
     # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
     # print(f'Cleaned up: {ds.cleanup_cache_files()}')
 
@@ -300,10 +303,12 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                         'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
                         'show_task_ids': args.show_task_ids,
                     },
-                    num_proc=args.nproc
+                    num_proc=args.nproc,
+                    keep_in_memory=True,
+                    cache_dir=eval_file
                 )
-                for f in ds0.cache_files:
-                    os.remove(f['filename'])
+                # for f in ds0.cache_files:
+                #     shutil.rmtree(os.path.dirname(f['filename']))
                 ds0.save_to_disk(eval_file)
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
             ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits'])
@@ -315,7 +320,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():
-        for example in ds.take(2):
+        for example in ds.take(1):
             print(example['eval_input_ids'])
             print(tokenizer.decode(example['eval_input_ids']))
             print(example['eval_labels'])

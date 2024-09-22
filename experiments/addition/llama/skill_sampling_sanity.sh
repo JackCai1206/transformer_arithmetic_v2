@@ -6,6 +6,7 @@ set -e
 #     True True 1000 100 \
 #     False False 1000 100 \
 # ; do
+
 for rope_theta in 1e3 Inf; do
     for do_train num_eval in \
         True 128 \

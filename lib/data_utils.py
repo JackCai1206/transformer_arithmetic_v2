@@ -45,7 +45,7 @@ def get_line(a, b, op=None, format=None, train=None):
         elif format == 'automata_C':
             return get_reverse_add_automata(a, b, type='C')
         elif format == 'add1':
-            return get_add1(a)
+            return get_add1(a, b)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)
@@ -227,7 +227,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     ds_list = []
     for opi, frac in enumerate(args.op_dist_train):
-        ds = Dataset.from_generator(
+        ds = IterableDataset.from_generator(
             data_generator,
             gen_kwargs={
                 'train': True,
@@ -237,12 +237,10 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
                 'shard': [range(i * round((args.num_train * frac) // args.nproc), (i + 1) * round((args.num_train * frac) // args.nproc)) for i in range(args.nproc)],
                 'show_task_ids': args.show_task_ids
             },
-            num_proc=args.nproc,
         )
-        ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]}, num_proc=args.nproc)
-        ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, num_proc=args.nproc)
-        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask', 'n_digits'], num_proc=args.nproc)
-        ds = ds.to_iterable_dataset(num_shards=args.nproc)
+        ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]})
+        ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
+        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask', 'n_digits'])
         ds_list.append(ds)
 
     op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]

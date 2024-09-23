@@ -182,10 +182,10 @@ class EarlyStoppingCallback(TrainerCallback):
     def on_evaluate(self, args, state: TrainerState, control: TrainerControl, model, metrics, **kwargs):
         control.should_training_stop = self.should_stop(state, metrics)
     
-    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        if state.total_flos >= 511_920_053_762_457_600:
-            control.should_training_stop = True
-            control.should_evaluate = True
+    # def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+    #     if state.total_flos >= 511_920_053_762_457_600:
+    #         control.should_training_stop = True
+    #         control.should_evaluate = True
 
 from transformers import Constraint, LogitsProcessor
 

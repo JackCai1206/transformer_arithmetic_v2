@@ -9,7 +9,7 @@ set -e
     # --max_grad_norm=1 \
     # --warmup_ratio=0.1 \
 
-for seed in 42 43 44; do
+for seed in 42 43 44 45 46; do
     for rope_theta in 1e5; do
         for resume do_train num_eval in \
             False True 1024 \

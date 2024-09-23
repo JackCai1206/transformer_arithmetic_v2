@@ -252,7 +252,11 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         train_dataset=train_dataset if train_args.do_train else None,
         eval_dataset=eval_datasets if train_args.do_eval else None,
         compute_metrics=partial(compute_metrics, tokenizer),
-        data_collator=PromptAnswerDataCollator(pad_token_id=tokenizer.pad_token_id)
+        data_collator=PromptAnswerDataCollator(
+            pad_token_id=tokenizer.pad_token_id,
+            label_pad_token_id=-100,
+            train_pad_side=data_args.padding_side
+        )
     )
 
     AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])

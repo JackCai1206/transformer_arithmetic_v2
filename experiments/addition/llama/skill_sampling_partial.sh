@@ -57,7 +57,7 @@ for seed in 42 43 44; do
                 --adam_beta2=0.98 \
                 --adam_epsilon=1e-8 \
                 --weight_decay=0.01 \
-                --warmup_ratio=0.1 \
+                --warmup_ratio=0.2 \
                 --logging_steps=20 \
                 --eval_strategy="steps" \
                 --eval_steps=200 \

@@ -353,8 +353,13 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     return ds
 
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
-    left_pad_list: tuple = ('prompt', 'eval_input_ids', 'eval_attention_mask', 'input_ids', 'attention_mask', 'labels')
-    rand_pad_list: tuple = ()
+    left_pad_list: tuple = ['prompt', 'eval_input_ids', 'eval_attention_mask']
+    rand_pad_list: tuple = []
+    
+    def __init__(self, pad_token_id=None, label_pad_token_id=None, train_pad_side='right'):
+        super().__init__(pad_token_id=pad_token_id, label_pad_token_id=label_pad_token_id)
+        if train_pad_side == 'left':
+            self.left_pad_list += ['input_ids', 'attention_mask', 'labels']
     
     # def get_rand_pad(self, features):
     #     key = self.rand_pad_list[0]

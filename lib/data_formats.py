@@ -15,13 +15,13 @@ def split_digits(a, b):
     return a_digits, b_digits, carries
 
 def get_COT(a, b):
-    a_digits, b_digits, carries = split_digits(a, b)
+    a_digits, b_digits, carries = split_digits(int(a), int(b))
     a_str = ''.join(map(str, a_digits))
     b_str = ''.join(map(str, b_digits))
 
     prompt = ''
     cot = ''
-    ans = str(a + b)[::-1] # left justify means padding on the right
+    ans = str(int(a) + int(b))[::-1] # left justify means padding on the right
     
     abc_list = list(enumerate(zip(a_digits, b_digits, carries)))
     k = len(abc_list)
@@ -34,11 +34,13 @@ def get_COT(a, b):
             else:
                 c_prev = 0
                 ans_prev = ''
-            prompt = f'D{ans_prev}\nC{c_prev}P{a_str[i:]}+{b_str[i:]}='
-            cot += f'A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'
+            # prompt = f'D{ans_prev}\nC{c_prev}P{a_str[i:]}+{b_str[i:]}='
+            prompt = f'Q{str(a)}+{str(b)}='
+            cot += f'\nC0P{a_str[i:]}+{b_str[i:]}='
+            cot += f'A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'            
         else:
             cot += f'P{a_str[i:]}+{b_str[i:]}=A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'
-
+    cot += f'P =A B S D{ans}'
     # if train:
     #     print(prompt + cot)
     #     breakpoint()

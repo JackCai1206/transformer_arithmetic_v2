@@ -48,10 +48,10 @@ def get_tokenizer(model_args: ModelArguments, data_args: DataArguments):
 
 def get_all_datasets(train_args: Seq2SeqTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
     train_dataset, eval_datasets = None, None
-    if train_args.do_train:
-        train_dataset = get_train_dataset(train_args, data_args, tokenizer)
     if train_args.do_eval:
-        eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
+        eval_datasets, unmapped_eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
+    if train_args.do_train:
+        train_dataset = get_train_dataset(train_args, data_args, tokenizer, no_sample_from=unmapped_eval_datasets)
     tokenizer.padding_side = 'left' # in case it was changed by the data generator
     return train_dataset, eval_datasets
 
@@ -199,7 +199,7 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
         # forced_eos_token_id=tokenizer.eos_token_id
     )
 
-    train_args.run_name = f"{model_args.model_id}"
+    train_args.run_name += f"-{model_args.model_id}"
     if model_args.from_pretrained:
         train_args.run_name += "-pretrained"
     if model_args.use_lora:
@@ -209,7 +209,7 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
     if model_args.freeze_except:
         train_args.run_name += "-frzex-" + model_args.freeze_except
     if model_args.rope_theta != torch.inf:
-        train_args.run_name += f"-rope-{model_args.rope_theta}"
+        train_args.run_name += f"-rope"
     disp_task = [data_args.format_train[i] if data_args.format_train[i] != 'None' else data_args.op_train[i] for i in range(len(data_args.format_train))]
     train_args.run_name += f'-{disp_task}-digits-{data_args.n_digits_train}'
     translator = str.maketrans('/,', '__', ''.join(set(string.punctuation + string.whitespace) - set('/,_-')))
@@ -226,6 +226,8 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
             train_args.resume_from_checkpoint = get_last_checkpoint(train_args.output_dir)
         except FileNotFoundError:
             train_args.resume_from_checkpoint = None
+    elif train_args.resume_from_checkpoint == 'False':
+        train_args.resume_from_checkpoint = None
     else:
         # Try finding a checkpoint in the provided path
         try:
@@ -234,6 +236,11 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
                 train_args.resume_from_checkpoint = ckpt_dir
         except:
             pass
+    
+    train_args.run_name += f'-seed-{train_args.seed}'
+    
+    if not train_args.do_train:
+        train_args.run_name += '-eval'
 
     return train_args
 
@@ -245,7 +252,11 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         train_dataset=train_dataset if train_args.do_train else None,
         eval_dataset=eval_datasets if train_args.do_eval else None,
         compute_metrics=partial(compute_metrics, tokenizer),
-        data_collator=PromptAnswerDataCollator(pad_token_id=tokenizer.pad_token_id)
+        data_collator=PromptAnswerDataCollator(
+            pad_token_id=tokenizer.pad_token_id,
+            label_pad_token_id=-100,
+            train_pad_side=data_args.padding_side
+        )
     )
 
     AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])

@@ -37,7 +37,7 @@ def get_args():
 def get_tokenizer(model_args: ModelArguments, data_args: DataArguments):
     # We don't pad when generating the datasets
     # During eval, the inputs are padded on the left and the labels are padding on the right using custom data collator
-    all_chars = string.ascii_letters + string.digits + string.punctuation + ' '
+    all_chars = string.ascii_letters + string.digits + string.punctuation + ' ' + '\n'
     tokenizer = CharacterTokenizer(all_chars, model_args.max_position_embeddings)
     tokenizer.padding_side == 'left'
 

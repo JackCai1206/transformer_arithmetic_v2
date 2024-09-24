@@ -341,3 +341,76 @@ def get_3parity(a):
         s += str((int(ai) + int(bi)) % 2)
     a_str = ''.join(map(str, a))
     return f'C{a_str}=', s, None
+
+
+def get_random_truncated_number(a, b):
+    # for string a, b (numbers), return a length-1 truncated version of a or b (or both)
+    if len(a) == 1 and len(b) == 1:
+        orig_a, orig_b = a, b
+        # re-pick both numbers until a != a and b != b
+        while a == orig_a and b == orig_b:
+            a = str(randint(0, 9))
+            b = str(randint(0, 9))
+    elif len(a) == 1:
+        # randomly drop one digit from b from any position of b
+        i = randint(0, len(b) - 1)
+        b = b[:i] + b[i+1:]
+    elif len(b) == 1:
+        # randomly drop one digit from a from any position of a
+        i = randint(0, len(a) - 1)
+        a = a[:i] + a[i+1:]
+    else:
+        # randomly drop one digit from a or b (or both)
+        if random() < 0.5:
+            i = randint(0, len(a) - 1)
+            a = a[:i] + a[i+1:]
+            i = randint(0, len(b) - 1)
+            b = b[:i] + b[i+1:]
+        else:
+            if random() < 0.5:
+                i = randint(0, len(a) - 1)
+                a = a[:i] + a[i+1:]
+            else:
+                i = randint(0, len(b) - 1)
+                b = b[:i] + b[i+1:]
+    return a, b
+
+
+def get_truncated_cot(l):
+    # for dpo: get randomly truncated cot for l
+    # l: string of prompt ex. [BOS]Q412661+1941=
+    a, b = l.split('+')
+    a = a[6:]
+    b = b[:-1]
+    a, b = get_random_truncated_number(a, b)
+
+    a_digits, b_digits, carries = split_digits(int(a), int(b))
+    a_str = ''.join(map(str, a_digits))
+    b_str = ''.join(map(str, b_digits))
+
+    prompt = ''
+    cot = ''
+    ans = str(int(a) + int(b))[::-1] # left justify means padding on the right
+    
+    abc_list = list(enumerate(zip(a_digits, b_digits, carries)))
+    k = len(abc_list)
+    j = 0
+    for i, (a_i, b_i, c_i) in abc_list[j:j+k]:
+        if i == j:
+            if i - 1 >= 0:
+                c_prev = carries[i-1]
+                ans_prev = ans[:i]
+            else:
+                c_prev = 0
+                ans_prev = ''
+            # prompt = f'D{ans_prev}\nC{c_prev}P{a_str[i:]}+{b_str[i:]}='
+            prompt = f'Q{str(a)}+{str(b)}='
+            cot += f'\nC0P{a_str[i:]}+{b_str[i:]}='
+            cot += f'A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'            
+        else:
+            cot += f'P{a_str[i:]}+{b_str[i:]}=A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'
+    cot += f'P =A B S D{ans}'
+    # if train:
+    #     print(prompt + cot)
+    #     breakpoint()
+    return cot

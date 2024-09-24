@@ -334,7 +334,11 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     def get_dpo_format(batch):
         batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
         batch['chosen'] = [i + tokenizer.eos_token for i in batch['target']]
-        batch['rejected'] = [rand_trunc(i) + tokenizer.eos_token for i in batch['target']]
+        if 'COT' in args.format_train:
+            from .data_formats import get_truncated_cot
+            batch['rejected'] = [get_truncated_cot(i) + tokenizer.eos_token for i in batch['prompt']]
+        else:
+            batch['rejected'] = [rand_trunc(i) + tokenizer.eos_token for i in batch['target']]
         # batch['rejected'] = [tokenizer.eos_token for i in batch['target']]
         return batch
     
@@ -412,7 +416,7 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 padding_value = 0
             elif k.endswith('loss_mask'):
                 padding_value = 0
-            elif k == 'prompt_token_type_ids': # this one seems to be missing
+            elif k == 'prompt_token_type_ids' or k == 'n_digits': # this one seems to be missing
                 # padding_value = 0
                 continue
             else:

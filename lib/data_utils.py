@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import itertools
 import os
 import shutil
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -152,7 +152,7 @@ def data_generator(
 def get_dataset_display_name(n_digits, op, format):
     return f'{n_digits}-{op}-{format}'
 
-def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer, no_sample_from: dict[str, Dataset]=None):
+def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer, no_sample_from: Dict[str, Dataset]=None):
     def add_special_tokens(batch, add_eos=True):
         batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
         if add_eos:

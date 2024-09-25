@@ -8,6 +8,9 @@ import numpy as np
 class ScriptArguments:
     foo: str = 'bar'
     do_dpo: bool = False
+    ref_model: bool = False
+    ref_model_path: Optional[str] = None
+    dpo_beta: Optional[float] = 0.5
 
 @dataclass
 class ModelArguments:

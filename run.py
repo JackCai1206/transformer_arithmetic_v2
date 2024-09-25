@@ -14,14 +14,14 @@ train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
 
-import wandb
-wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
+# import wandb
+# wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
 
-# Workaround for incrorrect global metrics
-# define our custom x axis metric
-wandb.define_metric("train/global_step")
-# set all other train/ metrics to use this step
-wandb.define_metric("*", step_metric="train/global_step")
+# # Workaround for incrorrect global metrics
+# # define our custom x axis metric
+# wandb.define_metric("train/global_step")
+# # set all other train/ metrics to use this step
+# wandb.define_metric("*", step_metric="train/global_step")
 
 if train_args.do_train:
     if train_args.resume_from_checkpoint is not None:
@@ -80,16 +80,29 @@ if args.do_dpo:
     dpo_dataset = get_dpo_dataset(data_args, tokenizer)
 
     # 2. Train DPO model, eval with seq2seq trainer
-    # ref_model = get_model(model_args, tokenizer)
+    ref_model = None
+    if args.ref_model:
+        import torch
+        import copy
+        new_model_args = copy.deepcopy(model_args)
+        new_model_args.model_id = None
+        ref_model = get_model(train_args, new_model_args, tokenizer)
+        ref_model_ckpt_path = os.path.join(args.ref_model_path, 'pytorch_model.bin')
+        ref_model.load_state_dict(torch.load(ref_model_ckpt_path))        
+        ref_model.eval()
+
     dpo_config = HfArgumentParser((DPOSeq2SeqConfig), allow_abbrev=False).parse_args_into_dataclasses(return_remaining_strings=True)[0]
     dpo_config = cast(DPOSeq2SeqConfig, dpo_config)
     dpo_config.run_name = train_args.run_name + '-dpo'
     dpo_config.output_dir = train_args.output_dir + '-dpo'
     dpo_config.reference_free = True
-    dpo_config.beta = 0.5
+    dpo_config.max_length = 1024
+    dpo_config.max_prompt_length = 128 # default
+    dpo_config.beta = args.dpo_beta
+
     dpo_trainer = DPOTrainerDefaultEval(
         model=model,
-        ref_model=None,
+        ref_model=ref_model,
         train_dataset=dpo_dataset,
         eval_dataset=eval_datasets,
         args=dpo_config,

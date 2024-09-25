@@ -70,6 +70,8 @@ def get_reverse_add_automata(a, b, type='A'):
 
 def get_reverse_add(a, b):
     s = str(int(a) + int(b))[::-1]
+    l = max(len(a), len(b))
+    s = s.ljust(l+1, '0')
     return f'C{a[::-1]}+{b[::-1]}=', s, None
 
 def get_reverse_add_cont(a, b):
@@ -339,3 +341,8 @@ def get_3parity(a):
         s += str((int(ai) + int(bi)) % 2)
     a_str = ''.join(map(str, a))
     return f'C{a_str}=', s, None
+
+if __name__ == '__main__': 
+    print(get_reverse_carry_only('122343', '994499'))
+    print(get_reverse_no_carry('122343', '994499'))
+    print(get_reverse_add('122343', '994499'))

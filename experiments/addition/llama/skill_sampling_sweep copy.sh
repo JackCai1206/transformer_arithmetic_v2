@@ -37,7 +37,6 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --format_eval='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_eval='1 1 1' \
                     --show_task_ids=True \
-                    --padding_side='random' \
                     \
                     \
                     --resume_from_checkpoint=True \

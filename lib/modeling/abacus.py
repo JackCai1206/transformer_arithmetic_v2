@@ -227,12 +227,14 @@ class AbacusLlamaModel(AbacusMixin, LlamaModel):
         hidden_states = inputs_embeds
 
         # create position embeddings to be shared across the decoder layers
-        if self.config.rope_theta == torch.inf:
-            B, L = hidden_states.size()[:2]
-            D = self.config.hidden_size // self.config.num_attention_heads
-            position_embeddings = torch.ones(B, L, D, device=hidden_states.device), torch.zeros(B, L, D, device=hidden_states.device)
-        else:
-            position_embeddings = self.rotary_emb(hidden_states, position_ids)
+        B, L = hidden_states.size()[:2]
+        D = self.config.hidden_size // self.config.num_attention_heads
+        position_embeddings = torch.ones(B, L, D, device=hidden_states.device), torch.zeros(B, L, D, device=hidden_states.device)
+        if self.config.rope_theta != torch.inf:
+            rotary_dim = int(self.config.partial_rotary_factor * D)
+            cos, sin = self.rotary_emb(hidden_states, position_ids)
+            position_embeddings[0][:, :, :rotary_dim] = cos
+            position_embeddings[1][:, :, :rotary_dim] = sin
 
         # Add abacus embeddings
         abacus_embeddings = self.get_abacus_position_ids(input_ids, use_cache=past_key_values is not None and past_key_values.get_seq_length() > 0)

@@ -28,7 +28,7 @@ def get_args():
     train_args = cast(Seq2SeqTrainingArguments, train_args)
     data_args = cast(DataArguments, data_args)
     data_args.block_size = model_args.max_position_embeddings
-    if model_args.rope_theta == 'Inf': 
+    if model_args.rope_theta == 'Inf':
         model_args.rope_theta = torch.inf
 
     set_seed(train_args.seed)
@@ -218,6 +218,7 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
     train_args.output_dir = f"out/{train_args.run_name}"
     train_args.save_safetensors = False # supposed to fix "There were missing keys in the checkpoint model loaded: ['lm_head.weight']."
     train_args.dataloader_num_workers = data_args.nproc
+    train_args.dataloader_prefetch_factor = 3
     train_args.remove_unused_columns = False
     
     if train_args.resume_from_checkpoint == 'True':

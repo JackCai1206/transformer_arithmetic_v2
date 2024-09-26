@@ -365,17 +365,19 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         super().__init__(pad_token_id=pad_token_id, label_pad_token_id=label_pad_token_id)
         if train_pad_side == 'left':
             self.left_pad_list += ['input_ids', 'attention_mask', 'labels']
+        elif train_pad_side == 'random':
+            self.rand_pad_list = ['input_ids', 'attention_mask', 'labels']
     
-    # def get_rand_pad(self, features):
-    #     key = self.rand_pad_list[0]
-    #     if key in features:
-    #         feat = features[key]
-    #         max_len = max([len(ex) for ex in feat])
-    #         pad_amt = [max_len - len(ex) for ex in feat]
-    #         # self.rand_pad_amt = [random.randint(0, pad) for pad in pad_amt]
-    #         self.rand_pad_amt = [pad for pad in pad_amt]
-    #     else:
-    #         self.rand_pad_amt = None
+    def get_rand_pad(self, features):
+        key = self.rand_pad_list[0]
+        if key in features:
+            feat = features[key]
+            max_len = max([len(ex) for ex in feat])
+            pad_amt = [max_len - len(ex) for ex in feat]
+            self.rand_pad_amt = [random.randint(0, pad) for pad in pad_amt]
+            # self.rand_pad_amt = [pad for pad in pad_amt]
+        else:
+            self.rand_pad_amt = None
 
     def __call__(self, features):
         # convert to dict of lists and pop the labels
@@ -386,7 +388,8 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         # dict_keys(['loss_mask', 'input_ids', 'attention_mask', 'eval_labels']) 
         # or dict_keys(['prompt', 'loss_mask', 'chosen', 'rejected', 'chosen_input_ids', 'chosen_attention_mask', 'chosen_labels', 'rejected_input_ids', 'rejected_attention_mask', 'rejected_labels', 'prompt_input_ids', 'prompt_token_type_ids', 'prompt_attention_mask'])
 
-        # self.get_rand_pad(features)
+        if len(self.rand_pad_list) > 0:
+            self.get_rand_pad(features)
 
         padded_batch = {}
         for k, feat in features.items():
@@ -428,14 +431,13 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
             else:
                 input_k = k
 
-            padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
-            # max_len = max([len(ex) for ex in to_pad])
-            # pad_amt = [max_len - len(ex) for ex in to_pad]
-            # if k in self.rand_pad_list:
-            #     left_pad = self.rand_pad_amt
-            # else:
-            #     left_pad = [0] * len(to_pad)
-            # padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
+            if k in self.rand_pad_list:
+                max_len = max([len(ex) for ex in to_pad])
+                pad_amt = [max_len - len(ex) for ex in to_pad]
+                left_pad = self.rand_pad_amt
+                padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
+            else:
+                padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
 
             if k in self.left_pad_list:
                 padded_batch[input_k] = padded_batch[input_k].flip(dims=[1])

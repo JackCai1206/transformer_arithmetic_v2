@@ -9,7 +9,7 @@ set -e
     # --max_grad_norm=1 \
     # --warmup_ratio=0.1 \
 
-for seed in 42 43 44 45 46; do
+for seed in 45 46; do
     for rope_theta in 1e5; do
         for resume do_train num_eval in \
             False True 1024 \
@@ -38,6 +38,7 @@ for seed in 42 43 44 45 46; do
             --format_eval='reverse-no-carry reverse-carry-only reverse' \
             --op_dist_eval='1 1 1' \
             --show_task_ids=True \
+            --padding_side='random' \
             \
             \
             --save_total_limit=1 \
@@ -56,7 +57,7 @@ for seed in 42 43 44 45 46; do
             --warmup_ratio=0.2 \
             --logging_steps=20 \
             --eval_strategy="steps" \
-            --eval_steps=250 \
+            --eval_steps=200 \
             --predict_with_generate \
             --remove_unused_columns=False \
             --eval_on_start=False \

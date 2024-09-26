@@ -9,14 +9,14 @@ set -e
     # --max_grad_norm=1 \
     # --warmup_ratio=0.1 \
 
-for seed in 42 43 44; do
+for seed in 45 46; do
     for format in \
         'reverse-carry-only' \
         'reverse-no-carry' \
     ; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
-                False True 128 \
+                False True 1024 \
                 True False 10000 \
             ; do
             CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \

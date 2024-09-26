@@ -37,6 +37,9 @@ elif train_args.do_eval and not args.do_dpo:
     trainer.evaluate()
 
 if args.do_dpo:
+    import torch
+    import copy
+    
     from typing import cast
     from functools import partial
 
@@ -82,8 +85,6 @@ if args.do_dpo:
     # 2. Train DPO model, eval with seq2seq trainer
     ref_model = None
     if args.ref_model:
-        import torch
-        import copy
         new_model_args = copy.deepcopy(model_args)
         new_model_args.model_id = None
         ref_model = get_model(train_args, new_model_args, tokenizer)
@@ -99,6 +100,10 @@ if args.do_dpo:
     dpo_config.max_length = 1024
     dpo_config.max_prompt_length = 128 # default
     dpo_config.beta = args.dpo_beta
+
+    if train_args.resume_from_checkpoint is not None:
+        resume_ckpt_path = os.path.join(train_args.resume_from_checkpoint, 'pytorch_model.bin')
+        model.load_state_dict(torch.load(resume_ckpt_path))        
 
     dpo_trainer = DPOTrainerDefaultEval(
         model=model,

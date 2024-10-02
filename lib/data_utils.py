@@ -7,7 +7,7 @@ from typing import List, Tuple
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from .configs import DataArguments
-from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
+from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_backtrack, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
 
 import random
 import numpy as np
@@ -46,6 +46,8 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_reverse_add_automata(a, b, type='C')
         elif format == 'add1':
             return get_add1(a, b)
+        elif format == 'backtrack':
+            return get_reverse_add_backtrack(a, b)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)
@@ -253,7 +255,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     # l = []
     print('----------- Examples from train: -------------')
-    for example in itertools.islice(ds, 0, 1):
+    for example in itertools.islice(ds, 0, 10):
         print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
         print(example['labels'])
@@ -264,6 +266,9 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
     # plt.hist(l, bins=100)
     # plt.savefig('train_hist.png')
     # breakpoint()
+    
+    if not args.use_train_attention_mask:
+        ds = ds.remove_columns('attention_mask')
     
     return ds
 

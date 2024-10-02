@@ -83,6 +83,26 @@ def get_reverse_add_cont(a, b):
     s = ''.join(s)
     return f'{a[::-1]}+{b[::-1]}=', s, None
 
+def get_reverse_add_backtrack(a, b, p=0.2):
+    s = str(int(a) + int(b))[::-1]
+    l = max(len(a), len(b))
+    s = s.ljust(l+1, '0')
+    cot = ''
+    loss_mask = []
+    for i in range(len(s)):
+        available = list(range(10))
+        available.remove(int(s[i]))
+        shuffle(available)
+        while random() < p and len(available) > 0 and len(cot) < 100:
+            wrong = available.pop()
+            cot += f'{wrong}X'
+            loss_mask += [1, 1] # do we train on the wrong digit? 
+        cot += s[i]
+        loss_mask += [1]
+
+    assert len(cot) == len(loss_mask), (len(s), len(cot), len(loss_mask))
+    return f'C{a[::-1]}+{b[::-1]}=', cot, loss_mask
+
 def get_forward(a, b):
     s = str(int(a) + int(b))
     return f'A{a}+{b}=', s, None

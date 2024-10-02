@@ -39,6 +39,7 @@ class CharacterTokenizer(PreTrainedTokenizer):
         pad_token = AddedToken("[PAD]", lstrip=False, rstrip=False)
         unk_token = AddedToken("[UNK]", lstrip=False, rstrip=False)
         mask_token = AddedToken("[MASK]", lstrip=True, rstrip=False)
+        backtrack_token_id = None
 
         self._vocab_str_to_int = {
             "[MASK]": -100,

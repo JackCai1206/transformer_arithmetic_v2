@@ -3,13 +3,27 @@ from transformers.integrations import WandbCallback
 import Levenshtein
 import numpy as np
 
-def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction):
+from lib.trainer_utils import MyTrainingArguments
+
+def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction, args: MyTrainingArguments):
     pred = pred_obj.predictions[:, pred_obj.inputs.shape[1]:]
     labels = pred_obj.label_ids
     # Padding handled in the trainer predict
     # min_len = min(pred.shape[1], labels.shape[1])
     # pred = pred[:, :min_len]
     # labels = labels[:, :min_len]
+    
+    if args.do_backtrack_decoding:
+        # we need to clean the backtrack tokens
+        backtrack_token_id = tokenizer.backtrack_token_id
+        cleaned_pred = np.zeros_like(pred)
+        for bi, p in enumerate(pred):
+            delete_mask = p == backtrack_token_id
+            delete_mask[:-1] |= delete_mask[1:]
+            p = p[~delete_mask]
+            cleaned_pred[bi, :len(p)] = p
+        pred = cleaned_pred[:, :labels.shape[1]]
+
     accuracy = (pred == labels).all(axis=1).mean()
     distance = sum([Levenshtein.ratio(pred[bi].tolist(), labels[bi].tolist()) for bi in range(pred.shape[0])]) / pred.shape[0]
 

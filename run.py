@@ -8,7 +8,6 @@ tokenizer = get_tokenizer(model_args, data_args)
 train_dataset, eval_datasets = get_all_datasets(train_args, data_args, tokenizer)
 
 model = get_model(train_args, model_args, tokenizer)
-print(model)
 
 train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 

@@ -254,16 +254,10 @@ def get_itcopy_rev(a, b):
 
 def get_sd_mult(a, b):
     a_rev = a[::-1]
-    i = int(choice(range(len(b))))
-    task_id = chr(ord('C') + i)
     b_rev = b[::-1]
-    # b_rev = ''.join(['0' if i != j else b_rev[i] for j in range(len(b))])
-    return f'{a_rev}*{b_rev}{task_id}=', '0' * i + str(int(a) * int(b_rev[i]))[::-1], None
-    # cot = []
-    # for i, bi in enumerate(b_rev):
-    #     cot.append('0' * i + str(int(a) * int(bi))[::-1])
-    # cot = '+'.join(cot)
-    # return f'{a_rev}*{b_rev}A=', f'{cot}B='
+    op1 = '0' + str(int(a) * int(b_rev[0]))[::-1]
+    op2 = str(int(a) * int(b_rev[1]))[::-1]
+    return f'B{a_rev}*{b_rev}=', f'C{op1}+{op2}', None
 
 def get_mult(a, b):
     a_rev = a[::-1]
@@ -272,7 +266,7 @@ def get_mult(a, b):
     for i, bi in enumerate(b_rev):
         cot.append('0' * i + str(int(a) * int(bi))[::-1])
     cot = '+'.join(cot)
-    return f'{a_rev}*{b_rev}AB=', f'{cot}B=' + str(int(a) * int(b))[::-1], None
+    return f'A{a_rev}*{b_rev}=', f'{cot}=' + str(int(a) * int(b))[::-1], None
 
 def get_cumsum(a):
     a_rev = a[::-1]

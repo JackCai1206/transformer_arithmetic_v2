@@ -10,7 +10,8 @@
 		"--gpus",
 		"all",
 		"--pid=host",
-		"--ipc=host"
+		"--ipc=host",
+		"--runtime=nvidia"
 	],
 	"features": {
 		"ghcr.io/devcontainers/features/nvidia-cuda:1": {},

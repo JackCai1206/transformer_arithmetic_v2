@@ -15,7 +15,11 @@ from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from lib.data_utils import PromptAnswerDataCollator
 
-class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
+@dataclass
+class MyTrainingArguments(Seq2SeqTrainingArguments):
+    do_backtrack_decoding: bool = False
+
+class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):    
     def prediction_step(
         self,
         model: nn.Module,
@@ -87,7 +91,12 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
 
         loss_mask = generation_inputs['loss_mask']
         del generation_inputs['loss_mask']
-        if (loss_mask == 1).all():
+        if self.args.do_backtrack_decoding:
+            backtrack_tok = self.tokenizer.backtrack_token_id
+            logits_processor = BacktrackLogitsProcessor(generation_inputs['labels'], backtrack_tok, eos_tok=self.tokenizer.eos_token_id)
+            gen_kwargs['max_new_tokens'] = gen_kwargs['max_new_tokens'] * 3
+            generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs, logits_processor=[logits_processor])
+        elif (loss_mask == 1).all():
             generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs)
         else:
             logits_processor = TemplateLogitsProcessor(loss_mask, generation_inputs['labels'])
@@ -233,10 +242,37 @@ class TemplateLogitsProcessor(LogitsProcessor):
         self.force_mask = loss_mask == 0
         self.labels = labels
         self.count = 0
-    
+
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         mask = self.force_mask[:, self.count]
         labels = self.labels[:, self.count]
         scores[mask] = scores[mask].scatter(1, labels[mask][:, None], torch.inf)
         self.count += 1
+        return scores
+
+class BacktrackLogitsProcessor(LogitsProcessor):
+    def __init__(self, labels, backtrack_tok, eos_tok):
+        self.labels = labels
+        self.backtrack_tok = torch.tensor(backtrack_tok)
+        self.eos_tok = torch.tensor(eos_tok)
+        self.count = 0
+        self.label_count = torch.zeros(labels.shape[0], dtype=torch.long)
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        if self.count > 0:
+            labels = self.labels[torch.arange(self.labels.shape[0]), self.label_count.clip(max=self.labels.shape[1]-1)]
+            input_ids = input_ids[:, -1]
+            ended = self.label_count >= self.labels.shape[1]
+            labels[ended] = input_ids[ended] # If there are no more labels to match, don't force anything
+            mask = (labels != input_ids) & (input_ids != self.backtrack_tok)
+            if mask.any():
+                # when the model generates wrong tokens that aren't backtrack tokens, force a backtrack token
+                scores[mask] = scores[mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[mask]), 9e9)
+                # If the model hasn't generated all the labels, prevent [EOS] from being generated
+                scores[~ended] = scores[~ended].scatter(1, self.eos_tok.to(input_ids.device).expand_as(scores[~ended]), -9e9)
+
+            self.label_count += (labels == input_ids).to(self.label_count.device) # when the model generates the correct token, increment the label count
+
+        self.count += 1
+
         return scores

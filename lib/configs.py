@@ -50,6 +50,7 @@ class DataArguments:
     add_special_tokens: bool = True
     show_task_ids: bool = True
     padding_side: str = 'right'
+    use_train_attention_mask: bool = True
 
     def __post_init__(self):
     #     if self.format.startswith("{"):

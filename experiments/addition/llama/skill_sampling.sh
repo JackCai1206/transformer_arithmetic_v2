@@ -12,7 +12,7 @@ set -e
 for seed in 45 46; do
     for rope_theta in 1e5; do
         for resume do_train num_eval in \
-            False True 1024 \
+            True True 1024 \
             True False 10000 \
         ; do
         CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online python run.py \
@@ -60,9 +60,9 @@ for seed in 45 46; do
             --eval_steps=200 \
             --predict_with_generate \
             --remove_unused_columns=False \
-            --eval_on_start=False \
+            --eval_on_start=$resume \
             --per_device_train_batch_size=400 \
-            --per_device_eval_batch_size=1024 \
+            --per_device_eval_batch_size=512 \
             --gradient_accumulation_steps=3 \
             --include_inputs_for_metrics=True \
             --save_steps=500 \

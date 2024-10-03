@@ -13,14 +13,16 @@ train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
 
-import wandb
-wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
+# check local rank
+if os.environ["LOCAL_RANK"] == "0":
+    import wandb
+    wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
 
-# Workaround for incrorrect global metrics
-# define our custom x axis metric
-wandb.define_metric("train/global_step")
-# set all other train/ metrics to use this step
-wandb.define_metric("*", step_metric="train/global_step")
+    # Workaround for incrorrect global metrics
+    # define our custom x axis metric
+    wandb.define_metric("train/global_step")
+    # set all other train/ metrics to use this step
+    wandb.define_metric("*", step_metric="train/global_step")
 
 if train_args.do_train:
     if train_args.resume_from_checkpoint is not None:

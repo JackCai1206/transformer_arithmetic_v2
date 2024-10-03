@@ -257,12 +257,15 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         data_collator=PromptAnswerDataCollator(
             pad_token_id=tokenizer.pad_token_id,
             label_pad_token_id=-100,
-            train_pad_side=data_args.padding_side
+            train_pad_side=data_args.padding_side,
+            train_pad_to=data_args.train_pad_to if os.environ.get("WORLD_SIZE") is not None else None,
+            eval_pad_to=data_args.eval_pad_to if os.environ.get("WORLD_SIZE") is not None else None
         )
     )
 
-    AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
-    trainer.add_callback(AddConfigCB)
+    if os.environ["LOCAL_RANK"] == "0":
+        AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
+        trainer.add_callback(AddConfigCB)
 
     if train_args.metric_for_best_model is not None:
         EarlyStoppingCB = EarlyStoppingCallback(metric_name=train_args.metric_for_best_model, threshold=0.99, patience=1)

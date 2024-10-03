@@ -244,7 +244,7 @@ class TemplateLogitsProcessor(LogitsProcessor):
         self.count = 0
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
-        mask = self.force_mask[:, self.count]
+        mask = self.force_mask[:, self.count] if self.count < self.force_mask.shape[1] else torch.zeros_like(self.force_mask[:, 0])
         labels = self.labels[:, self.count]
         scores[mask] = scores[mask].scatter(1, labels[mask][:, None], torch.inf)
         self.count += 1

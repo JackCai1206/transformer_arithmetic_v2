@@ -51,6 +51,8 @@ class DataArguments:
     show_task_ids: bool = True
     padding_side: str = 'right'
     use_train_attention_mask: bool = True
+    train_pad_to: Optional[int] = None
+    eval_pad_to: Optional[int] = None
 
     def __post_init__(self):
     #     if self.format.startswith("{"):

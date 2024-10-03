@@ -285,6 +285,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
         batch_new['labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
         for k in batch_new.keys():
             batch_new['eval_' + k] = batch_new.pop(k)
+        batch_new['eval_loss_mask'] = batch['loss_mask']
         return batch_new
 
     ds_list = {}
@@ -314,7 +315,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                 #     shutil.rmtree(os.path.dirname(f['filename']))
                 ds0.save_to_disk(eval_file)
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
-            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits'])
+            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits', 'loss_mask'])
 
             key = get_dataset_display_name(n_digits, args.op_eval[opi], args.format_eval[opi])
             ds_list[key] = ds
@@ -328,6 +329,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
             print(tokenizer.decode(example['eval_input_ids']))
             print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
+            print(example.keys())
 
     return ds_list, unmapped_ds_list
 
@@ -360,14 +362,17 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
     left_pad_list: tuple = ['prompt', 'eval_input_ids', 'eval_attention_mask']
     rand_pad_list: tuple = []
-    
-    def __init__(self, pad_token_id=None, label_pad_token_id=None, train_pad_side='right'):
+
+    def __init__(self, pad_token_id=None, label_pad_token_id=None, train_pad_side='right', train_pad_to=None, eval_pad_to=None):
         super().__init__(pad_token_id=pad_token_id, label_pad_token_id=label_pad_token_id)
         if train_pad_side == 'left':
             self.left_pad_list += ['input_ids', 'attention_mask', 'labels']
         elif train_pad_side == 'random':
             self.rand_pad_list = ['input_ids', 'attention_mask', 'labels']
-    
+
+        self.train_pad_to = train_pad_to
+        self.eval_pad_to = eval_pad_to
+
     def get_rand_pad(self, features):
         key = self.rand_pad_list[0]
         if key in features:
@@ -414,8 +419,10 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
             
             # remove the eval_ prefix to conform to model input names
             if 'eval_' in k:
+                is_train = False
                 input_k = k.replace('eval_', '')
             else:
+                is_train = True
                 input_k = k
 
             if k in self.rand_pad_list:
@@ -425,6 +432,13 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
             else:
                 padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
+
+            pad_to = self.train_pad_to if is_train else self.eval_pad_to
+            if pad_to is not None:
+                if padded_batch[input_k].shape[1] < pad_to:
+                    padded_batch[input_k] = torch.nn.functional.pad(padded_batch[input_k], (0, pad_to - padded_batch[input_k].shape[1]), value=padding_value)
+                else:
+                    raise ValueError(f"Cannot pad {k} to max_length {pad_to} because it is already longer than that")
 
             if k in self.left_pad_list:
                 padded_batch[input_k] = padded_batch[input_k].flip(dims=[1])

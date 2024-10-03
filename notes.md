@@ -14,7 +14,7 @@
 - train on composed task, and test on LG for individual tasks
   - Does not work well/ more noisy
 - compare with abacus 
-  - fixed a bug for inference, but not sure, sanity checking (WIP ida 2)
+  - should work if I just train longer? (WIP ida 1,2)
 
 ## Smaller tasks
 - rotate-reverse
@@ -24,10 +24,12 @@
 - Given a min length, whats the max length that can be generalized to? 
   - poor performance for 4x and 8x
     - Conclusion is that max_len must be 2 * min_len
-    - small + 20k steps (WIP idunn 1)
-  - have to try dropping attention masks now (WIP idunn 2)
+    - small + 20k steps
+  - have to try dropping attention masks now
 - Vary only the model size and keep compute the same
 - Sample complexity - reduce the number of samples for main task
+  - There could be better ways to sample - right now its just random
+  - WIP idunn 1, 2
 
 ## COT "Chain-length generalization"
 - Show that TF can auto-compose the two reasoning steps

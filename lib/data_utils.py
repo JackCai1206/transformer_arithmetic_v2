@@ -103,13 +103,17 @@ def data_generator(
     n_digits_b_range: Tuple[int] | None = None,
     train: bool = True,
     shard: List[int] = None,
-    no_sample_set: set = None
+    no_sample_set: set = None,
+    seed: int = None
 ):
     if n_digits_b_range is None:
         n_digits_b_range = n_digits_a_range
 
     assert len(shard) == 1, f'Shard should be a list of one range, but got: {shard}'
     no_sample_hit = 0
+    if not train:
+        seed = 1000 + seed
+    random.seed(seed)
     for _ in shard[0]:
         if op == 'sort':
             # Generate a random list of digits
@@ -217,15 +221,19 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
     
     for key in no_sample_from:
         no_sample_from[key] = no_sample_from[key].to_dict()
+        no_sample_from[key]['prompt'] = set(no_sample_from[key]['prompt']) # convert to set for faster lookup
 
     def filter_eval(example, op=None, format=None):
         if example['n_digits'][0] != example['n_digits'][1]:
             # We don't sample asymmetric examples in test, so these are definitely good
             return True
+        elif example['n_digits'][0] < 8:
+            # We cannot avoid repeating examples with low n_digits
+            return True
         key = get_dataset_display_name(example['n_digits'][0], op, format)
         if key not in no_sample_from:
             return True
-        return no_sample_from[key]['prompt'] != example['prompt']
+        return example['prompt'] not in no_sample_from[key]['prompt']
 
     ds_list = []
     for opi, frac in enumerate(args.op_dist_train):
@@ -236,8 +244,9 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
                 'op': args.op_train[opi],
                 'format': args.format_train[opi],
                 'n_digits_a_range': args.n_digits_train[opi],
-                'shard': [range(i * round((args.num_train * frac) // args.nproc), (i + 1) * round((args.num_train * frac) // args.nproc)) for i in range(args.nproc)],
-                'show_task_ids': args.show_task_ids
+                'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
+                'show_task_ids': args.show_task_ids,
+                'seed': train_args.seed,
             },
         )
         ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]})
@@ -246,7 +255,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         ds_list.append(ds)
 
     op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]
-    ds = interleave_datasets(ds_list, probabilities=op_dist_train, seed=train_args.seed)
+    ds = interleave_datasets(ds_list, probabilities=op_dist_train, seed=train_args.seed, stopping_strategy='all_exhausted')
     # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
     # print(f'Cleaned up: {ds.cleanup_cache_files()}')
 
@@ -255,7 +264,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     # l = []
     print('----------- Examples from train: -------------')
-    for example in itertools.islice(ds, 0, 10):
+    for example in itertools.islice(ds, 0, 100):
         print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
         print(example['labels'])
@@ -294,7 +303,8 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
         for opi, frac in enumerate(args.op_dist_eval):
             os.makedirs(args.eval_samples_file, exist_ok=True)
             eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}-{train_args.seed}')
-            if os.path.exists(eval_file):
+            # if os.path.exists(eval_file):
+            if False:
                 ds0 = Dataset.load_from_disk(eval_file)
             else:
                 ds0 = Dataset.from_generator(
@@ -306,6 +316,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                         'n_digits_a_range': (n_digits, n_digits + 1),
                         'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
                         'show_task_ids': args.show_task_ids,
+                        'seed': train_args.seed,
                     },
                     num_proc=args.nproc,
                     keep_in_memory=True,
@@ -352,7 +363,8 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
             'op': args.op_train[0],
             'format': args.format_train[0],
             'n_digits_a_range': args.n_digits_train[0],
-            'shard': [range(i * round((args.num_train * 1) // args.nproc), (i + 1) * round((args.num_train * 1) // args.nproc)) for i in range(args.nproc)]
+            'shard': [range(i * round((args.num_train[0] * 1) // args.nproc), (i + 1) * round((args.num_train[0] * 1) // args.nproc)) for i in range(args.nproc)],
+            # 'seed': 0 TODO: fix
         },
     ) \
     .map(get_dpo_format, batched=True, batch_size=1000, remove_columns=['target'])

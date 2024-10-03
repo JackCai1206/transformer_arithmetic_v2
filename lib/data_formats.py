@@ -286,7 +286,9 @@ def get_mult(a, b):
     for i, bi in enumerate(b_rev):
         cot.append('0' * i + str(int(a) * int(bi))[::-1])
     cot = '+'.join(cot)
-    return f'A{a_rev}*{b_rev}=', f'{cot}=' + str(int(a) * int(b))[::-1], None
+    s = str(int(a) * int(b))[::-1]
+    s = s.ljust(len(a)+1, '0')
+    return f'A{a_rev}*{b_rev}=', f'C{cot}={s}', None
 
 def get_cumsum(a):
     a_rev = a[::-1]

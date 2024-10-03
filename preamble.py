@@ -211,6 +211,8 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
         train_args.run_name += "-frzex-" + model_args.freeze_except
     if model_args.rope_theta != torch.inf:
         train_args.run_name += f"-rope"
+    if len(set(data_args.num_train)) != 1:
+        train_args.run_name += f"-train-{data_args.num_train}"
     disp_task = [data_args.format_train[i] if data_args.format_train[i] != 'None' else data_args.op_train[i] for i in range(len(data_args.format_train))]
     train_args.run_name += f'-{disp_task}-digits-{data_args.n_digits_train}'
     translator = str.maketrans('/,', '__', ''.join(set(string.punctuation + string.whitespace) - set('/,_-')))

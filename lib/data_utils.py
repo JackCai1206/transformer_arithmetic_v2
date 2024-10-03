@@ -7,7 +7,7 @@ from typing import List, Tuple, Union, Dict
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from .configs import DataArguments
-from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
+from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_backtrack, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
 
 import random
 import numpy as np
@@ -46,6 +46,8 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_reverse_add_automata(a, b, type='C')
         elif format == 'add1':
             return get_add1(a, b)
+        elif format == 'backtrack':
+            return get_reverse_add_backtrack(a, b)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)
@@ -101,13 +103,17 @@ def data_generator(
     n_digits_b_range: Union[Tuple[int], None] = None, # Use Union for Python < 3.10 Tuple[int] | None = None,
     train: bool = True,
     shard: List[int] = None,
-    no_sample_set: set = None
+    no_sample_set: set = None,
+    seed: int = None
 ):
     if n_digits_b_range is None:
         n_digits_b_range = n_digits_a_range
 
     assert len(shard) == 1, f'Shard should be a list of one range, but got: {shard}'
     no_sample_hit = 0
+    if not train:
+        seed = 1000 + seed
+    random.seed(seed)
     for _ in shard[0]:
         if op == 'sort':
             # Generate a random list of digits
@@ -215,15 +221,19 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
     
     for key in no_sample_from:
         no_sample_from[key] = no_sample_from[key].to_dict()
+        no_sample_from[key]['prompt'] = set(no_sample_from[key]['prompt']) # convert to set for faster lookup
 
     def filter_eval(example, op=None, format=None):
         if example['n_digits'][0] != example['n_digits'][1]:
             # We don't sample asymmetric examples in test, so these are definitely good
             return True
+        elif example['n_digits'][0] < 8:
+            # We cannot avoid repeating examples with low n_digits
+            return True
         key = get_dataset_display_name(example['n_digits'][0], op, format)
         if key not in no_sample_from:
             return True
-        return no_sample_from[key]['prompt'] != example['prompt']
+        return example['prompt'] not in no_sample_from[key]['prompt']
 
     ds_list = []
     for opi, frac in enumerate(args.op_dist_train):
@@ -234,8 +244,9 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
                 'op': args.op_train[opi],
                 'format': args.format_train[opi],
                 'n_digits_a_range': args.n_digits_train[opi],
-                'shard': [range(i * round((args.num_train * frac) // args.nproc), (i + 1) * round((args.num_train * frac) // args.nproc)) for i in range(args.nproc)],
-                'show_task_ids': args.show_task_ids
+                'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
+                'show_task_ids': args.show_task_ids,
+                'seed': train_args.seed,
             },
         )
         ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]})
@@ -244,7 +255,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         ds_list.append(ds)
 
     op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]
-    ds = interleave_datasets(ds_list, probabilities=op_dist_train, seed=train_args.seed)
+    ds = interleave_datasets(ds_list, probabilities=op_dist_train, seed=train_args.seed, stopping_strategy='all_exhausted')
     # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
     # print(f'Cleaned up: {ds.cleanup_cache_files()}')
 
@@ -253,7 +264,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
 
     # l = []
     print('----------- Examples from train: -------------')
-    for example in itertools.islice(ds, 0, 1):
+    for example in itertools.islice(ds, 0, 100):
         print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
         print(example['labels'])
@@ -264,6 +275,9 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
     # plt.hist(l, bins=100)
     # plt.savefig('train_hist.png')
     # breakpoint()
+    
+    if not args.use_train_attention_mask:
+        ds = ds.remove_columns('attention_mask')
     
     return ds
 
@@ -280,6 +294,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
         batch_new['labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
         for k in batch_new.keys():
             batch_new['eval_' + k] = batch_new.pop(k)
+        batch_new['eval_loss_mask'] = batch['loss_mask']
         return batch_new
 
     ds_list = {}
@@ -288,7 +303,8 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
         for opi, frac in enumerate(args.op_dist_eval):
             os.makedirs(args.eval_samples_file, exist_ok=True)
             eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}-{train_args.seed}')
-            if os.path.exists(eval_file):
+            # if os.path.exists(eval_file):
+            if False:
                 ds0 = Dataset.load_from_disk(eval_file)
             else:
                 ds0 = Dataset.from_generator(
@@ -300,6 +316,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                         'n_digits_a_range': (n_digits, n_digits + 1),
                         'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
                         'show_task_ids': args.show_task_ids,
+                        'seed': train_args.seed,
                     },
                     num_proc=args.nproc,
                     keep_in_memory=True,
@@ -309,7 +326,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                 #     shutil.rmtree(os.path.dirname(f['filename']))
                 ds0.save_to_disk(eval_file)
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
-            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits'])
+            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits', 'loss_mask'])
 
             key = get_dataset_display_name(n_digits, args.op_eval[opi], args.format_eval[opi])
             ds_list[key] = ds
@@ -323,6 +340,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
             print(tokenizer.decode(example['eval_input_ids']))
             print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
+            print(example.keys())
 
     return ds_list, unmapped_ds_list
 
@@ -349,8 +367,9 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
             'op': args.op_train[0],
             'format': args.format_train[0],
             'n_digits_a_range': args.n_digits_train[0],
-            'shard': [range(i * round((args.num_train * 1) // args.nproc), (i + 1) * round((args.num_train * 1) // args.nproc)) for i in range(args.nproc)],
-            'show_task_ids': args.show_task_ids
+            'shard': [range(i * round((args.num_train[0] * 1) // args.nproc), (i + 1) * round((args.num_train[0] * 1) // args.nproc)) for i in range(args.nproc)],
+            'show_task_ids': args.show_task_ids,
+            # 'seed': 0 TODO: fix
         },
     ) \
     .map(get_dpo_format, batched=True, batch_size=1000, remove_columns=['target'])
@@ -360,14 +379,17 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
     left_pad_list: tuple = ['prompt', 'eval_input_ids', 'eval_attention_mask']
     rand_pad_list: tuple = []
-    
-    def __init__(self, pad_token_id=None, label_pad_token_id=None, train_pad_side='right'):
+
+    def __init__(self, pad_token_id=None, label_pad_token_id=None, train_pad_side='right', train_pad_to=None, eval_pad_to=None):
         super().__init__(pad_token_id=pad_token_id, label_pad_token_id=label_pad_token_id)
         if train_pad_side == 'left':
             self.left_pad_list += ['input_ids', 'attention_mask', 'labels']
         elif train_pad_side == 'random':
             self.rand_pad_list = ['input_ids', 'attention_mask', 'labels']
-    
+
+        self.train_pad_to = train_pad_to
+        self.eval_pad_to = eval_pad_to
+
     def get_rand_pad(self, features):
         key = self.rand_pad_list[0]
         if key in features:
@@ -427,8 +449,10 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
             
             # remove the eval_ prefix to conform to model input names
             if 'eval_' in k:
+                is_train = False
                 input_k = k.replace('eval_', '')
             else:
+                is_train = True
                 input_k = k
 
             if k in self.rand_pad_list:
@@ -438,6 +462,13 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
             else:
                 padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
+
+            pad_to = self.train_pad_to if is_train else self.eval_pad_to
+            if pad_to is not None:
+                if padded_batch[input_k].shape[1] < pad_to:
+                    padded_batch[input_k] = torch.nn.functional.pad(padded_batch[input_k], (0, pad_to - padded_batch[input_k].shape[1]), value=padding_value)
+                else:
+                    raise ValueError(f"Cannot pad {k} to max_length {pad_to} because it is already longer than that")
 
             if k in self.left_pad_list:
                 padded_batch[input_k] = padded_batch[input_k].flip(dims=[1])

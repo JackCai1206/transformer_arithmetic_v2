@@ -1,9 +1,10 @@
+from functools import partial
 from typing import List, Optional, Tuple, Union
 import torch
 import random
 from transformers import FalconConfig, FalconForCausalLM, LlamaConfig, LlamaForCausalLM
 from transformers.models.falcon.modeling_falcon import FalconRotaryEmbedding
-from transformers.models.llama.modeling_llama import BaseModelOutputWithPast, LlamaModel
+from transformers.models.llama.modeling_llama import BaseModelOutputWithPast, LlamaModel, LlamaRMSNorm
 from transformers.cache_utils import DynamicCache, Cache
 
 # """Implementation of abacus embeddings"""
@@ -75,7 +76,7 @@ from transformers.cache_utils import DynamicCache, Cache
 
 class AbacusConfig:
     digit_tokens: List[int] = None
-    max_k: int = 300
+    max_k: int = 200
     return_position_ids: bool = False
 
 class AbacusMixin:
@@ -112,7 +113,7 @@ class AbacusMixin:
         super().__init__(*args, **kwargs) # this will initialize the model
         assert self.config is not None
         self.register_buffer("digits", torch.tensor(self.config.digit_tokens), persistent=False)
-        self.embedding = torch.nn.Embedding(self.config.max_position_embeddings, self.config.hidden_size)
+        self.abacus_embedding = torch.nn.Embedding(self.config.max_position_embeddings, self.config.hidden_size)
         self.offset = None
 
     def get_abacus_position_ids(self, input_ids, use_cache=None):
@@ -124,7 +125,7 @@ class AbacusMixin:
                 self.offset = position_ids
             else:
                 position_ids = self.helper(mask, input_ids.device)
-                self.offset = position_ids[:, -2:-1]
+                self.offset = position_ids[:, -1:]
         else:
             position_ids = self.helper(mask, input_ids.device)
 
@@ -136,7 +137,7 @@ class AbacusMixin:
         if self.config.return_position_ids:
             return position_ids
         else:
-            return self.embedding(position_ids)
+            return self.abacus_embedding(position_ids)
     
 
 # class AbacusFalconConfig(FalconConfig, AbacusConfig):
@@ -162,6 +163,7 @@ class AbacusMixin:
 
 
 class AbacusLlamaConfig(LlamaConfig, AbacusConfig):
+    partial_rotary_factor: float = 1
     pass
 
 class AbacusLlamaModel(AbacusMixin, LlamaModel):
@@ -239,6 +241,7 @@ class AbacusLlamaModel(AbacusMixin, LlamaModel):
         # Add abacus embeddings
         abacus_embeddings = self.get_abacus_position_ids(input_ids, use_cache=past_key_values is not None and past_key_values.get_seq_length() > 0)
         hidden_states += abacus_embeddings
+        # hidden_states = self.norm(hidden_states)
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None

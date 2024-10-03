@@ -10,22 +10,22 @@ from lib.eval_utils import compute_metrics
 from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelWithAddRules
 from lib.modeling.llama import LlamaForCausalLMWithNoPE
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
-from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss
+from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments
 from lib.modeling.cat import ConvLlamaForCausalLM
 from lib.modeling.abacus import AbacusLlamaForCausalLM, AbacusLlamaModel, AbacusLlamaConfig
 from charactertokenizer import CharacterTokenizer
 
 from typing import cast
-from transformers import Seq2SeqTrainingArguments, HfArgumentParser, set_seed, GenerationConfig, AutoModelForCausalLM, AutoConfig, PreTrainedModel, LlamaConfig, LlamaForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, PreTrainedTokenizer
+from transformers import HfArgumentParser, set_seed, GenerationConfig, AutoModelForCausalLM, AutoConfig, PreTrainedModel, LlamaConfig, LlamaForCausalLM, AutoTokenizer, DataCollatorForSeq2Seq, PreTrainedTokenizer
 from transformers.trainer_utils import get_last_checkpoint
 from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 
 def get_args():
-    args, model_args, data_args, train_args = HfArgumentParser((ScriptArguments, ModelArguments, DataArguments, Seq2SeqTrainingArguments)).parse_args_into_dataclasses()
+    args, model_args, data_args, train_args = HfArgumentParser((ScriptArguments, ModelArguments, DataArguments, MyTrainingArguments)).parse_args_into_dataclasses()
     args = cast(ScriptArguments, args)
     model_args = cast(ModelArguments, model_args)
-    train_args = cast(Seq2SeqTrainingArguments, train_args)
+    train_args = cast(MyTrainingArguments, train_args)
     data_args = cast(DataArguments, data_args)
     data_args.block_size = model_args.max_position_embeddings
     if model_args.rope_theta == 'Inf':
@@ -40,13 +40,14 @@ def get_tokenizer(model_args: ModelArguments, data_args: DataArguments):
     all_chars = string.ascii_letters + string.digits + string.punctuation + ' ' + '\n'
     tokenizer = CharacterTokenizer(all_chars, model_args.max_position_embeddings)
     tokenizer.padding_side == 'left'
+    tokenizer.backtrack_token_id = tokenizer.convert_tokens_to_ids(['X'])[0]
 
     if any([x == 'sort' for x in data_args.op_train]):
         added_tokens = tokenizer.add_tokens([f'[{str(i).zfill(2)}]' for i in range(100)])
 
     return tokenizer
 
-def get_all_datasets(train_args: Seq2SeqTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+def get_all_datasets(train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
     train_dataset, eval_datasets = None, None
     if train_args.do_eval:
         eval_datasets, unmapped_eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
@@ -55,7 +56,7 @@ def get_all_datasets(train_args: Seq2SeqTrainingArguments, data_args: DataArgume
     tokenizer.padding_side = 'left' # in case it was changed by the data generator
     return train_dataset, eval_datasets
 
-def get_model(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, tokenizer: PreTrainedTokenizer):
+def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, tokenizer: PreTrainedTokenizer):
     if model_args.model_id is not None:
         model: PreTrainedModel
         if model_args.from_pretrained:
@@ -187,7 +188,7 @@ def get_model(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, 
 
     return model
 
-def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
     train_args.generation_config = GenerationConfig(
         do_sample=False,
         num_beams=1,
@@ -210,6 +211,8 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
         train_args.run_name += "-frzex-" + model_args.freeze_except
     if model_args.rope_theta != torch.inf:
         train_args.run_name += f"-rope"
+    if len(set(data_args.num_train)) != 1:
+        train_args.run_name += f"-train-{data_args.num_train}"
     disp_task = [data_args.format_train[i] if data_args.format_train[i] != 'None' else data_args.op_train[i] for i in range(len(data_args.format_train))]
     train_args.run_name += f'-{disp_task}-digits-{data_args.n_digits_train}'
     translator = str.maketrans('/,', '__', ''.join(set(string.punctuation + string.whitespace) - set('/,_-')))
@@ -245,23 +248,26 @@ def prepare_train_args(train_args: Seq2SeqTrainingArguments, model_args: ModelAr
 
     return train_args
 
-def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: ModelArguments, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, train_args: Seq2SeqTrainingArguments, train_dataset: Dataset, eval_datasets: Dataset):
+def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: ModelArguments, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, train_args: MyTrainingArguments, train_dataset: Dataset, eval_datasets: Dataset):
     trainer = Seq2SeqTrainerNoEvalLoss(
         model=model,
         tokenizer=tokenizer,
         args=train_args,
         train_dataset=train_dataset if train_args.do_train else None,
         eval_dataset=eval_datasets if train_args.do_eval else None,
-        compute_metrics=partial(compute_metrics, tokenizer),
+        compute_metrics=partial(compute_metrics, tokenizer, args=train_args),
         data_collator=PromptAnswerDataCollator(
             pad_token_id=tokenizer.pad_token_id,
             label_pad_token_id=-100,
-            train_pad_side=data_args.padding_side
+            train_pad_side=data_args.padding_side,
+            train_pad_to=data_args.train_pad_to if os.environ.get("WORLD_SIZE") is not None else None,
+            eval_pad_to=data_args.eval_pad_to if os.environ.get("WORLD_SIZE") is not None else None
         )
     )
 
-    AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
-    trainer.add_callback(AddConfigCB)
+    if "LOCAL_RANK" in os.environ and os.environ["LOCAL_RANK"] == "0":
+        AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
+        trainer.add_callback(AddConfigCB)
 
     if train_args.metric_for_best_model is not None:
         EarlyStoppingCB = EarlyStoppingCallback(metric_name=train_args.metric_for_best_model, threshold=0.99, patience=1)

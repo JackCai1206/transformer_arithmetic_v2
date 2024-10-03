@@ -8,20 +8,21 @@ tokenizer = get_tokenizer(model_args, data_args)
 train_dataset, eval_datasets = get_all_datasets(train_args, data_args, tokenizer)
 
 model = get_model(train_args, model_args, tokenizer)
-print(model)
 
 train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
 
-# import wandb
-# wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
+# check local rank
+# if "LOCAL_RANK" in os.environ and os.environ["LOCAL_RANK"] == "0":
+#     import wandb
+#     wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
 
-# # Workaround for incrorrect global metrics
-# # define our custom x axis metric
-# wandb.define_metric("train/global_step")
-# # set all other train/ metrics to use this step
-# wandb.define_metric("*", step_metric="train/global_step")
+#     # Workaround for incrorrect global metrics
+#     # define our custom x axis metric
+#     wandb.define_metric("train/global_step")
+#     # set all other train/ metrics to use this step
+#     wandb.define_metric("*", step_metric="train/global_step")
 
 if train_args.do_train:
     if train_args.resume_from_checkpoint is not None:
@@ -91,6 +92,11 @@ if args.do_dpo:
         ref_model_ckpt_path = os.path.join(args.ref_model_path, 'pytorch_model.bin')
         ref_model.load_state_dict(torch.load(ref_model_ckpt_path))        
         ref_model.eval()
+
+        # # check if ref_model is working
+        # import ipdb; ipdb.set_trace()
+        # trainer2 = get_trainer(args, data_args, model_args, ref_model, tokenizer, train_args, train_dataset, eval_datasets)
+        # trainer2.evaluate()
 
     dpo_config = HfArgumentParser((DPOSeq2SeqConfig), allow_abbrev=False).parse_args_into_dataclasses(return_remaining_strings=True)[0]
     dpo_config = cast(DPOSeq2SeqConfig, dpo_config)

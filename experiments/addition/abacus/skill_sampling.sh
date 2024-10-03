@@ -38,7 +38,7 @@ for seed in 42 43 44 45 46; do
             --format_eval='reverse-no-carry reverse-carry-only reverse' \
             --op_dist_eval='1 1 1' \
             --show_task_ids=True \
-            --padding_side='left' \
+            --padding_side='right' \
             \
             \
             --save_total_limit=1 \
@@ -52,7 +52,7 @@ for seed in 42 43 44 45 46; do
             --lr_scheduler_type='warmup_stable_decay' \
             --lr_scheduler_kwargs='{"num_stable_steps": 12000, "num_decay_steps": 4000}' \
             --adam_beta2=0.98 \
-            --adam_epsilon=1e-12 \
+            --adam_epsilon=1e-8 \
             --weight_decay=0.01 \
             --warmup_ratio=0.2 \
             --logging_steps=20 \

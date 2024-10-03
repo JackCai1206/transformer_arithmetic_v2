@@ -7,13 +7,10 @@ set -e
     # 4           8           1200        1          1024            \
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    8           32          2048        1          1024            \
-    4           32          2048        1          1024            \
-    8           16          2048        1          1024            \
     4           16          2048        1          1024            \
     4           8           2048        1          1024            \
 ; do
-    for seed in 42 43 44 45 46; do
+    for seed in 42 43 44; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
                 True True 1024 \
@@ -65,7 +62,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --eval_steps=250 \
                     --predict_with_generate \
                     --remove_unused_columns=False \
-                    --eval_on_start=$resume \
+                    --eval_on_start=False \
                     --per_device_train_batch_size=$batch_size \
                     --per_device_eval_batch_size=$eval_batch_size \
                     --gradient_accumulation_steps=$grad_acc \

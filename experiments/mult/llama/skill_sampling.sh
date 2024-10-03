@@ -59,7 +59,7 @@ for seed in 42 43 44; do
             --predict_with_generate \
             --remove_unused_columns=False \
             --eval_on_start=False \
-            --per_device_train_batch_size=400 \
+            --per_device_train_batch_size=600 \
             --per_device_eval_batch_size=1024 \
             --gradient_accumulation_steps=3 \
             --include_inputs_for_metrics=True \

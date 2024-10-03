@@ -265,7 +265,7 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         )
     )
 
-    if os.environ["LOCAL_RANK"] == "0":
+    if "LOCAL_RANK" in os.environ and os.environ["LOCAL_RANK"] == "0":
         AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
         trainer.add_callback(AddConfigCB)
 

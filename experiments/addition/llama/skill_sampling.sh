@@ -10,12 +10,12 @@ set -e
     # --warmup_ratio=0.1 \
 
 for seed in 42 43 44 45 46; do
-    for rope_theta in Inf; do
+    for rope_theta in 1e5 Inf; do
         for resume do_train num_eval in \
-            True True 1024 \
+            False True 1024 \
             True False 10000 \
         ; do
-        CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=1 WANDB_MODE=online python run.py \
             --seed=$seed \
             --architecture=llama \
             --from_pretrained=False \

@@ -1,13 +1,12 @@
 set -e
 
-for num_train in 10000 100000; do
-    for seed in 42; do
+for num_train in 10000 20000 30000 40000 50000; do
+    for seed in 42 43 44; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
                 False True 1024 \
-                True False 10000 \
             ; do
-            CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online WANDB_RUN_GROUP=sample-complexity python run.py \
+            CUDA_VISIBLE_DEVICES=1 WANDB_MODE=online WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sample-complexity-sanity python run.py \
                 --seed=$seed \
                 --architecture=llama \
                 --from_pretrained=False \
@@ -20,30 +19,30 @@ for num_train in 10000 100000; do
                 \
                 \
                 --nproc=1 \
-                --num_train='20_000_000 20_000_000 '$num_train'' \
+                --num_train=$num_train \
                 --num_eval=$num_eval \
-                --n_digits_train='1,33 1,33 1,17' \
-                --op_train='add add add' \
-                --format_train='reverse-no-carry reverse-carry-only reverse' \
-                --op_dist_train='1 1 1' \
-                --n_digits_eval='4,49,4' \
-                --op_eval='add add add' \
-                --format_eval='reverse-no-carry reverse-carry-only reverse' \
-                --op_dist_eval='1 1 1' \
+                --n_digits_train='1,17' \
+                --op_train='add' \
+                --format_train='reverse' \
+                --op_dist_train='1' \
+                --n_digits_eval='4,25,4' \
+                --op_eval='add' \
+                --format_eval='reverse' \
+                --op_dist_eval='1' \
                 --show_task_ids=True \
                 --padding_side='right' \
                 \
                 \
                 --save_total_limit=1 \
                 --resume_from_checkpoint=$resume \
-                --run_name='base' \
+                --run_name='SC-sanity' \
                 --output_dir=out \
                 --do_train=$do_train \
                 --do_eval=True \
-                --max_steps=10000 \
+                --max_steps=4000 \
                 --learning_rate=5e-4 \
                 --lr_scheduler_type='warmup_stable_decay' \
-                --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
+                --lr_scheduler_kwargs='{"num_stable_steps": 4000, "num_decay_steps": 500}' \
                 --adam_beta2=0.98 \
                 --adam_epsilon=1e-12 \
                 --weight_decay=0.01 \

@@ -70,4 +70,4 @@ class DataArguments:
         self.format_eval = tuple(self.format_eval.split(' '))
         self.n_digits_eval = tuple(map(int, self.n_digits_eval.split(',')))
         self.n_digits_dpo = tuple(map(int, self.n_digits_dpo.split(',')))
-        assert len(self.op_eval) == len(self.op_dist_eval) == len(self.format_eval) == len(self.n_digits_eval), 'You must provide the same number of values for op_eval, op_dist_eval, format_eval, and n_digits_eval'
+        # assert len(self.op_eval) == len(self.op_dist_eval) == len(self.format_eval) == len(self.n_digits_eval), 'You must provide the same number of values for op_eval, op_dist_eval, format_eval, and n_digits_eval'

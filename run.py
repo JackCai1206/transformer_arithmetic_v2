@@ -14,7 +14,7 @@ train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
 
 # check local rank
-if "LOCAL_RANK" in os.environ and os.environ["LOCAL_RANK"] == "0":
+if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
     import wandb
     wandb.init(project='LG-inherit', entity="jackcai1206", name=train_args.run_name)
 

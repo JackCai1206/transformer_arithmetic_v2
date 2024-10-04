@@ -136,6 +136,9 @@ def data_generator(
                 ndb = random.sample(range(*n_digits_a_range), 1)[0]
             a = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(nda - 1)])
             b = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(ndb - 1)])
+            # print('-----------')
+            # print(format, _, a, b)
+            # print('-----------')
             if no_sample_set is not None and (a, b) in no_sample_set:
                 no_sample_hit += 1
                 if no_sample_hit > 100:
@@ -265,9 +268,9 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
     # l = []
     print('----------- Examples from train: -------------')
     for example in itertools.islice(ds, 0, 100):
-        print(example['input_ids'])
+        # print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
-        print(example['labels'])
+        # print(example['labels'])
         print(tokenizer.decode(example['labels']))
     #     l.append(len(example['input_ids']))
 
@@ -340,7 +343,6 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
             print(tokenizer.decode(example['eval_input_ids']))
             print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
-            print(example.keys())
 
     return ds_list, unmapped_ds_list
 

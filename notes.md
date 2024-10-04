@@ -9,12 +9,12 @@
   - hope is that max LG is lower for the partial ones
   - doing 5 runs, and try to conclude from there
 - Result noisy is kinda confirmed, how to stabilize? 
-  - take the max? 
-  - edit distance IS monotone increase, so that's good
+  - Retry with same data seed across tasks
+  - NanoGPT + cosin lr sweep + small batch
 - train on composed task, and test on LG for individual tasks
   - Does not work well/ more noisy
 - compare with abacus 
-  - should work if I just train longer? (WIP ida 1,2)
+  - should work if I just train longer?
 
 ## Smaller tasks
 - rotate-reverse
@@ -25,11 +25,12 @@
   - poor performance for 4x and 8x
     - Conclusion is that max_len must be 2 * min_len
     - small + 20k steps
-  - have to try dropping attention masks now
+    - Retry with same data seed across tasks (WIP ida 1)
+  - have to try dropping attention masks
 - Vary only the model size and keep compute the same
 - Sample complexity - reduce the number of samples for main task
   - There could be better ways to sample - right now its just random
-  - WIP idunn 1, 2
+    - sapmle only 10-16 digits, only 16
 
 ## COT "Chain-length generalization"
 - Show that TF can auto-compose the two reasoning steps

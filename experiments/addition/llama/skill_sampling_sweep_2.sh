@@ -10,18 +10,16 @@ set -e
     # 16          32          400         3          1024            \
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    8           32          400         3          1024            \
-    4           32          400         3          1024            \
-    8           16          600         2          1024            \
-    4           16          600         2          1024            \
-    4           8           1200        1          1024            \
+    16           64          300         4          512            \
+    16           128         200         6          256            \
 ; do
     for seed in 42 43 44; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
                 False True 1024 \
+                True False 10000 \
             ; do
-                CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-length WANDB_MODE=online python run.py \
+                CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-length WANDB_MODE=online python run.py \
                     --seed=$seed \
                     --architecture=llama \
                     --from_pretrained=False \
@@ -44,7 +42,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --format_eval='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_eval='1 1 1' \
                     --show_task_ids=True \
-                    --padding_side='left' \
+                    --padding_side='right' \
                     \
                     \
                     --resume_from_checkpoint=$resume \
@@ -60,7 +58,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --adam_beta2=0.98 \
                     --adam_epsilon=1e-12 \
                     --weight_decay=0.01 \
-                    --warmup_ratio=0.1 \
+                    --warmup_ratio=0.21 \
                     --logging_steps=20 \
                     --eval_strategy="steps" \
                     --eval_steps=250 \

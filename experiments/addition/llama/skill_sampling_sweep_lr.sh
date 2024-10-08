@@ -7,23 +7,23 @@ set -e
     # 4           8           1200        1          1024            \
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    8           16          1024        1          1024            \
+    8           16          512         2          1024            \
 ; do
     for seed in 42 43 44 45 46; do
         for rope_theta in 1e5; do
-            for lr in 1e-3; do \
+            for lr in 2.5e-3 1e-3 7.5e-4 5e-4; do \
                 for resume do_train num_eval in \
                     False True 1024 \
                     True False 10000 \
                 ; do
-                    CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-lr WANDB_MODE=online python run.py \
+                    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-lr WANDB_MODE=online python run.py \
                         --seed=$seed \
                         --architecture=llama \
                         --from_pretrained=False \
-                        --hidden_size=384 \
+                        --hidden_size=768 \
                         --intermediate_size=1536 \
-                        --num_attention_heads=6 \
-                        --num_layers=6 \
+                        --num_attention_heads=12 \
+                        --num_layers=12 \
                         --max_position_embeddings=1024 \
                         --rope_theta=$rope_theta \
                         \
@@ -49,12 +49,12 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                         --output_dir=out \
                         --do_train=$do_train \
                         --do_eval=True \
-                        --max_steps=20000 \
+                        --max_steps=10000 \
                         --learning_rate=$lr \
                         --lr_scheduler_type='cosine' \
                         --adam_beta2=0.98 \
                         --adam_epsilon=1e-8 \
-                        --weight_decay=0.01 \
+                        --weight_decay=0.0 \
                         --warmup_ratio=0.1 \
                         --logging_steps=20 \
                         --eval_strategy="steps" \

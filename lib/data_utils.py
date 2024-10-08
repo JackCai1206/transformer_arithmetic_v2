@@ -7,7 +7,7 @@ from typing import List, Tuple
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from .configs import DataArguments
-from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_backtrack, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort
+from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_backtrack, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort, get_xor
 
 import random
 import numpy as np
@@ -92,6 +92,8 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_parity(a)
         elif format == '3parity':
             return get_3parity(a)
+        elif format == 'xor': 
+            return get_xor(a, b)
 
     raise ValueError(f'Unknown op or format: {op}, {format}')
 
@@ -123,9 +125,10 @@ def data_generator(
             prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
         elif op == 'boolean':
             nda = random.sample(range(*n_digits_a_range), 1)[0]
-            ndb = None
+            ndb = random.sample(range(*n_digits_b_range), 1)[0]
             a = [random.randint(0, 1) for _ in range(nda)]
-            prompt, target, loss_mask = get_line(a, None, op=op, format=format, train=train)
+            b = [random.randint(0, 1) for _ in range(ndb)]
+            prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
         else:
             nda = random.sample(range(*n_digits_a_range), 1)[0]
             if op == 'mult':
@@ -133,7 +136,7 @@ def data_generator(
             elif op == 'add' and 'automata' in format:
                 ndb = nda
             else:
-                ndb = random.sample(range(*n_digits_a_range), 1)[0]
+                ndb = random.sample(range(*n_digits_b_range), 1)[0]
             a = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(nda - 1)])
             b = str(random.randint(1, 9)) + ''.join([str(random.randint(0, 9)) for _ in range(ndb - 1)])
             # print('-----------')
@@ -145,8 +148,8 @@ def data_generator(
                     raise ValueError(f'No sample hit {no_sample_hit} times')
                 continue
             prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
-            if not show_task_ids: 
-                prompt = prompt[:-2] + prompt[-1]
+        if not show_task_ids: 
+            prompt = prompt[1:]
 
         if loss_mask is None:
             loss_mask = [1] * len(target)
@@ -272,6 +275,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         print(tokenizer.decode(example['input_ids']))
         # print(example['labels'])
         print(tokenizer.decode(example['labels']))
+        # breakpoint()
     #     l.append(len(example['input_ids']))
 
     # import matplotlib.pyplot as plt
@@ -323,11 +327,12 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                     },
                     num_proc=args.nproc,
                     keep_in_memory=True,
-                    cache_dir=eval_file
+                    cache_dir=eval_file,
+                    split='test'
                 )
                 # for f in ds0.cache_files:
                 #     shutil.rmtree(os.path.dirname(f['filename']))
-                ds0.save_to_disk(eval_file)
+                # ds0.save_to_disk(eval_file) 
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
             ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits', 'loss_mask'])
 

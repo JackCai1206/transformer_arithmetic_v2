@@ -16,7 +16,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     False True 1024 \
                     True False 10000 \
                 ; do
-                    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
+                    CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-small WANDB_MODE=online python run.py \
                         --seed=$seed \
                         --architecture=llama \
                         --from_pretrained=False \

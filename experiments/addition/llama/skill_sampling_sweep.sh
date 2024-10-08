@@ -17,7 +17,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
     4           8           1200        1          1024            \
 ; do
     for seed in 42; do
-        for rope_theta in 1e3 1e1; do
+        for rope_theta in 1e5; do
             for resume do_train num_eval in \
                 False True 1024 \
             ; do

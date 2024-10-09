@@ -10,14 +10,14 @@ set -e
     # --warmup_ratio=0.1 \
 
 for seed in 42 43 44 45 46; do
-    for rope_theta in 1e5 Inf; do
+    for rope_theta in Inf 1e5; do
         for resume do_train num_eval in \
             False True 1024 \
             True False 10000 \
         ; do
         CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=base WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama \
+            --architecture=llama-rpe \
             --from_pretrained=False \
             --hidden_size=768 \
             --intermediate_size=1536 \

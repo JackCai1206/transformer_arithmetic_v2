@@ -1,14 +1,19 @@
 import torch
 from typing import List, Optional, Tuple, Union
 
-from transformers import FalconConfig, FalconForCausalLM, LlamaConfig, LlamaForCausalLM
+from transformers import LlamaConfig, LlamaForCausalLM
 from transformers.models.falcon.modeling_falcon import FalconRotaryEmbedding
 from transformers.models.llama.modeling_llama import BaseModelOutputWithPast, LlamaModel
 from transformers.cache_utils import DynamicCache, Cache
 
+class MyLlamaConfig(LlamaConfig):
+    use_lpe: bool = False
+
 class LlamaModelWithNoPE(LlamaModel):
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
+        if config.use_lpe:
+            self.positional_embeddings = torch.nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
     def forward(
         self,
@@ -77,6 +82,10 @@ class LlamaModelWithNoPE(LlamaModel):
             cos, sin = self.rotary_emb(hidden_states, position_ids)
             position_embeddings[0][:, :, :rotary_dim] = cos
             position_embeddings[1][:, :, :rotary_dim] = sin
+        if self.config.use_lpe:
+            lpe = self.positional_embeddings(position_ids)
+            breakpoint()
+            hidden_states = hidden_states + lpe
 
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
@@ -143,5 +152,3 @@ class LlamaForCausalLMWithNoPE(LlamaForCausalLM):
         super().__init__(config)
         self.model = LlamaModelWithNoPE(config)
         self.post_init()
-
-

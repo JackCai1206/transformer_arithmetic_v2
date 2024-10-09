@@ -84,7 +84,6 @@ class LlamaModelWithNoPE(LlamaModel):
             position_embeddings[1][:, :, :rotary_dim] = sin
         if self.config.use_lpe:
             lpe = self.positional_embeddings(position_ids)
-            breakpoint()
             hidden_states = hidden_states + lpe
 
         # decoder layers

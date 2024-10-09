@@ -205,6 +205,17 @@ def get_forward_carry_only(a, b, randomize=False):
         s = ''.join(s)
         return f'B{a[::-1]}+{b[::-1]}=', s[::-1], None
 
+def get_xor(a, b):
+    l = max(len(a), len(b))
+    a_ljust = a + [0] * (l - len(a))
+    b_ljust = b + [0] * (l - len(b))
+    s = [ai ^ bi for ai, bi in zip(a_ljust, b_ljust)]
+    a = ''.join(map(lambda ai: chr(ord('a') + ai), a))
+    b = ''.join(map(lambda bi: chr(ord('a') + bi), b))
+    s = ''.join(map(lambda si: chr(ord('a') + si), s))
+    
+    return f'A{a}+{b}=', s, None
+
 def get_nar(a, n=5):
     i = randint(0, len(a) - n)
 

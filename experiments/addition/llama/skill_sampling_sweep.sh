@@ -16,13 +16,12 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
     4           16          600         2          1024            \
     4           8           1200        1          1024            \
 ; do
-    for seed in 42 43 44; do
+    for seed in 42; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
-                True True 1024 \
-                True False 10000 \
+                False True 1024 \
             ; do
-                CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_RUN_GROUP=sweep-length WANDB_MODE=online python run.py \
+                CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-length WANDB_MODE=online python run.py \
                     --seed=$seed \
                     --architecture=llama \
                     --from_pretrained=False \
@@ -54,10 +53,10 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --output_dir=out \
                     --do_train=$do_train \
                     --do_eval=True \
-                    --max_steps=10000 \
-                    --learning_rate=1e-4 \
+                    --max_steps=15000 \
+                    --learning_rate=2.5e-4 \
                     --lr_scheduler_type='warmup_stable_decay' \
-                    --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
+                    --lr_scheduler_kwargs='{"num_stable_steps": 11500, "num_decay_steps": 2000}' \
                     --adam_beta2=0.98 \
                     --adam_epsilon=1e-12 \
                     --weight_decay=0.01 \

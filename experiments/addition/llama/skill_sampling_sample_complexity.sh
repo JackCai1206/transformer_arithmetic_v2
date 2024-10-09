@@ -1,13 +1,13 @@
 set -e
 
-for num_train in 500 1000; do
-    for seed in 42; do
+for num_train in 2500 5000 7500 10000 50000; do
+    for seed in 42 43 44; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
                 False True 1024 \
                 True False 10000 \
             ; do
-            CUDA_VISIBLE_DEVICES=1 WANDB_MODE=online WANDB_RUN_GROUP=sample-complexity python run.py \
+            CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sample-complexity python run.py \
                 --seed=$seed \
                 --architecture=llama \
                 --from_pretrained=False \
@@ -36,7 +36,7 @@ for num_train in 500 1000; do
                 \
                 --save_total_limit=1 \
                 --resume_from_checkpoint=$resume \
-                --run_name='base' \
+                --run_name='SC' \
                 --output_dir=out \
                 --do_train=$do_train \
                 --do_eval=True \

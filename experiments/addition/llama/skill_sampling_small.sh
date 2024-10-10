@@ -17,7 +17,7 @@ for seed in 42 43 44 45 46; do
         ; do
         CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama-rpe \
+            --architecture=llama-temp-scale \
             --from_pretrained=False \
             --hidden_size=384 \
             --intermediate_size=1536 \
@@ -49,7 +49,7 @@ for seed in 42 43 44 45 46; do
             --max_steps=15000 \
             --learning_rate=1e-3 \
             --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 9000, "num_decay_steps": 4500}' \
+            --lr_scheduler_kwargs='{"num_stable_steps": 9000, "num_decay_steps": 4500, "min_lr_ratio": 0.5}' \
             --adam_beta2=0.98 \
             --adam_epsilon=1e-12 \
             --weight_decay=0.01 \
@@ -60,13 +60,13 @@ for seed in 42 43 44 45 46; do
             --predict_with_generate \
             --remove_unused_columns=False \
             --eval_on_start=False \
-            --per_device_train_batch_size=2048 \
+            --per_device_train_batch_size=1024 \
             --per_device_eval_batch_size=1024 \
             --gradient_accumulation_steps=1 \
             --include_inputs_for_metrics=True \
             --save_steps=500 \
             --torch_compile=True \
-            --bf16=True \
+            --bf16=False \
             --tf32=True
         done
     done

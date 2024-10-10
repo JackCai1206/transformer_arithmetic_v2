@@ -17,7 +17,7 @@ for seed in 42 43 44 45 46; do
         ; do
         CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=base WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama-rpe \
+            --architecture=llama \
             --from_pretrained=False \
             --hidden_size=768 \
             --intermediate_size=1536 \

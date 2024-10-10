@@ -31,7 +31,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --n_digits_train='1,'$((train_high+1))' 1,'$((train_low+1)) \
                     --op_train='add add' \
                     --format_train='reverse-no-carry reverse' \
-                    --op_dist_train='1 1' \
+                    --op_dist_train='1,1' \
                     --n_digits_eval=$((train_high/8))','$((train_high+train_high/4+1))','$((train_high/8)) \
                     --op_eval='add add' \
                     --format_eval='reverse-no-carry reverse' \

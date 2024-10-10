@@ -8,6 +8,7 @@
   - Train on just 1 aux task
 3. Custom LR scheduler
   1e-3, then 5e-4, then decay
+4. task ratio scheduling
 
 ## Smaller tasks
 - rotate-reverse

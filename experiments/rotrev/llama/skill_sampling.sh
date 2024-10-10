@@ -15,7 +15,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --n_digits_train='1,33 1,33 1,17' \
     --op_train='rotate1 reverse rot1rev' \
     --format_train='None None None' \
-    --op_dist_train='1 1 1' \
+    --op_dist_train='1,1,1' \
     --n_digits_eval='4,33,4' \
     --op_eval='rotate1 reverse rot1rev' \
     --format_eval='None None None' \

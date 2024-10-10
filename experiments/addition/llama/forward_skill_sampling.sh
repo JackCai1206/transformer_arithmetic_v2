@@ -24,7 +24,7 @@ for from_pretrained use_lora max_steps eval_steps in \
         --n_digits_train='1,64 1,64 1,32' \
         --op_train='add add add' \
         --format_train='forward-no-carry forward-carry-only forward' \
-        --op_dist_train='1 1 1' \
+        --op_dist_train='1,1,1' \
         --n_digits_eval='8,65,8' \
         --op_eval='add add add' \
         --format_eval='forward-no-carry forward-carry-only forward' \

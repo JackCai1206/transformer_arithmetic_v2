@@ -23,7 +23,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --n_digits_train='1,25 1,25 1,13' \
     --op_train='cumsum gt5 cumsum_gt5' \
     --format_train='None None None' \
-    --op_dist_train='1 1 1' \
+    --op_dist_train='1,1,1' \
     --n_digits_eval='3,31,3' \
     --op_eval='cumsum gt5 cumsum_gt5' \
     --format_eval='None None None' \

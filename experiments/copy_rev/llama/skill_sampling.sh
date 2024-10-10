@@ -15,7 +15,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --n_digits_train='1,25 1,25 1,13' \
     --op_train='copy copy copy' \
     --format_train='interleave_copy reverse_2op itcopy_rev' \
-    --op_dist_train='1 1 1' \
+    --op_dist_train='1,1,1' \
     --n_digits_eval='3,34,3' \
     --op_eval='copy copy copy' \
     --format_eval='interleave_copy reverse_2op itcopy_rev' \

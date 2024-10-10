@@ -24,7 +24,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --n_digits_train='2,65,2 2,66,2 2,21,2' \
     --op_train='boolean boolean boolean' \
     --format_train='3sum parity 3parity' \
-    --op_dist_train='1 1 1' \
+    --op_dist_train='1,1,1' \
     --n_digits_eval='8,97,8' \
     --op_eval='boolean boolean boolean' \
     --format_eval='3sum parity 3parity' \

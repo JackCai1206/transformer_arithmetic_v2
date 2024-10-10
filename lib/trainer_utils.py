@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
+import numpy as np
 
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
@@ -195,6 +197,18 @@ class EarlyStoppingCallback(TrainerCallback):
     #     if state.total_flos >= 511_920_053_762_457_600:
     #         control.should_training_stop = True
     #         control.should_evaluate = True
+
+class DataMixtureSchedulingCallback(TrainerCallback):
+    def __init__(self, init, end):
+        self.init = np.array(init)
+        self.end = np.array(end)
+    
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        step = state.global_step
+        total_steps = args.max_steps
+        mix = self.init + (self.end - self.init) * step / total_steps
+        mix = [r / sum(mix) for r in mix.tolist()]
+        kwargs['train_dataloader'].dataset._ex_iterable.probabilities = mix
 
 from transformers import Constraint, LogitsProcessor
 

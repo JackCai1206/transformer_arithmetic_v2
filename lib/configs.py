@@ -57,14 +57,14 @@ class DataArguments:
     def __post_init__(self):
     #     if self.format.startswith("{"):
     #         self.format = json.loads(self.format)
-        self.op_dist_train = tuple(map(float, self.op_dist_train.split(' ')))
+        self.op_dist_train = tuple(map(lambda x: tuple(map(float, x.split(','))), self.op_dist_train.split(' ')))
         self.op_train = tuple(self.op_train.split(' '))
         self.format_train = tuple(self.format_train.split(' '))
         self.n_digits_train = tuple(map(lambda x: tuple(map(int, x.split(','))), self.n_digits_train.split(' ')))
         self.num_train = tuple(map(int, self.num_train.split(' ')))
         if len(self.num_train) == 1:
             self.num_train = self.num_train * len(self.op_train)
-        assert len(self.num_train) == len(self.op_train) == len(self.op_dist_train) == len(self.format_train) == len(self.n_digits_train), 'You must provide the same number of values for num_train, op_train, op_dist_train, format_train, and n_digits_train'
+        assert len(self.num_train) == len(self.op_train) == len(self.op_dist_train[0]) == len(self.format_train) == len(self.n_digits_train), 'You must provide the same number of values for num_train, op_train, op_dist_train, format_train, and n_digits_train'
         self.op_eval = tuple(self.op_eval.split(' '))
         self.op_dist_eval = tuple(map(float, self.op_dist_eval.split(' ')))
         self.format_eval = tuple(self.format_eval.split(' '))

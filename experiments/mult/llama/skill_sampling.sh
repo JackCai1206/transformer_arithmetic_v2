@@ -30,7 +30,7 @@ for seed in 42 43 44; do
             --n_digits_train='1,17 1,9 1,17' \
             --op_train='mult mult add' \
             --format_train='sd_mult mult reverse' \
-            --op_dist_train='1 1 1' \
+            --op_dist_train='1,1,1' \
             --n_digits_eval='4,17,2' \
             --op_eval='mult mult add' \
             --format_eval='sd_mult mult reverse' \

@@ -242,7 +242,7 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         return example['prompt'] not in no_sample_from[key]['prompt']
 
     ds_list = []
-    for opi, frac in enumerate(args.op_dist_train):
+    for opi, frac in enumerate(args.op_dist_train[0]):
         ds = IterableDataset.from_generator(
             data_generator,
             gen_kwargs={
@@ -260,8 +260,8 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'loss_mask', 'n_digits'])
         ds_list.append(ds)
 
-    op_dist_train = [frac / sum(args.op_dist_train) for frac in args.op_dist_train]
-    ds = interleave_datasets(ds_list, probabilities=op_dist_train, seed=train_args.seed, stopping_strategy='all_exhausted')
+    init_probs = [frac / sum(args.op_dist_train[0]) for frac in args.op_dist_train[0]]
+    ds = interleave_datasets(ds_list, probabilities=init_probs, seed=train_args.seed, stopping_strategy='all_exhausted')
     # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
     # print(f'Cleaned up: {ds.cleanup_cache_files()}')
 

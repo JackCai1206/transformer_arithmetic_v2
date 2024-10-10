@@ -25,7 +25,7 @@ for num_train in 2500 5000 7500 10000 50000; do
                 --n_digits_train='1,33 1,33 1,17' \
                 --op_train='add add add' \
                 --format_train='reverse-no-carry reverse-carry-only reverse' \
-                --op_dist_train='1 1 1' \
+                --op_dist_train='1,1,1' \
                 --n_digits_eval='4,49,4' \
                 --op_eval='add add add' \
                 --format_eval='reverse-no-carry reverse-carry-only reverse' \

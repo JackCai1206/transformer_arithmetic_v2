@@ -11,7 +11,7 @@ from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelW
 from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
 from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
-from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments
+from lib.trainer_utils import AddWandbConfigCallback, DataMixtureSchedulingCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments
 from lib.modeling.cat import ConvLlamaForCausalLM
 from lib.modeling.abacus import AbacusLlamaForCausalLM, AbacusLlamaModel, AbacusLlamaConfig
 from charactertokenizer import CharacterTokenizer
@@ -290,5 +290,9 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
     if train_args.metric_for_best_model is not None:
         EarlyStoppingCB = EarlyStoppingCallback(metric_name=train_args.metric_for_best_model, threshold=0.99, patience=1)
         trainer.add_callback(EarlyStoppingCB)
+    
+    if len(data_args.op_dist_train) > 1:
+        MixtureCB = DataMixtureSchedulingCallback(init=data_args.op_dist_train[0], end=data_args.op_dist_train[1])
+        trainer.add_callback(MixtureCB)
 
     return trainer

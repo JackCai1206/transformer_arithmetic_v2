@@ -23,7 +23,7 @@ for train_low in 16; do
             --n_digits_train='1,'$((train_high+1))' 1,'$((train_high+1))' 1,'$((train_low+1)) \
             --op_train='rotate1 reverse rot1rev' \
             --format_train='None None None' \
-            --op_dist_train='1 1 1' \
+            --op_dist_train='1,1,1' \
             --n_digits_eval=$((train_high/8))','$((train_high+train_high/4+1))','$((train_high/8)) \
             --op_eval='rotate1 reverse rot1rev' \
             --format_eval='None None None' \

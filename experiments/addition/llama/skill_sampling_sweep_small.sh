@@ -7,12 +7,12 @@ set -e
     # 4           8           1200        1          1024            \
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    16          32          400         3          1024            \
-    8           32          400         3          1024            \
-    4           32          400         3          1024            \
-    8           16          600         2          1024            \
-    4           16          600         2          1024            \
-    4           8           1200        1          1024            \
+    50          100         1024        1          1024            \
+    20          100         1024        1          1024            \
+    10          100         1024        1          1024            \
+    25          50          1024        1          1024            \
+    10          50          1024        1          1024            \
+    5           50          1024        1          1024            \
 ; do
     for seed in 42 43 44 45 46; do
         for rope_theta in 1e5; do
@@ -43,8 +43,8 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --format_eval='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_eval='1 1 1' \
                     --show_task_ids=True \
-                    --padding_side='left' \
-                    --use_train_attention_mask=False \
+                    --padding_side='random' \
+                    --use_train_attention_mask=True \
                     \
                     \
                     --resume_from_checkpoint=$resume \
@@ -56,7 +56,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --max_steps=20000 \
                     --learning_rate=1e-3 \
                     --lr_scheduler_type='warmup_stable_decay' \
-                    --lr_scheduler_kwargs='{"num_stable_steps": 17000, "num_decay_steps": 2000}' \
+                    --lr_scheduler_kwargs='{"num_stable_steps": 10000, "num_decay_steps": 8000}' \
                     --adam_beta2=0.98 \
                     --adam_epsilon=1e-8 \
                     --weight_decay=0.01 \

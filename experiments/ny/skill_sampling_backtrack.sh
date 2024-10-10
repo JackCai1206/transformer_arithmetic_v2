@@ -81,13 +81,13 @@ done
 
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
-        for combo in "False True 1024" "True False 10000"; do
+        for combo in "False True 1000"; do
             set -- $combo
             resume=$1
             do_train=$2
             num_eval=$3
 
-            CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=arithmetic-dpo WANDB_MODE=online python run.py \
+            CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
                 --seed=$seed \
                 --architecture=llama \
                 --from_pretrained=False \
@@ -114,9 +114,11 @@ for seed in 43; do
                 \
                 \
                 --do_backtrack_decoding=True \
-                --save_total_limit=1 \
+                --backtrack_p=0.2 \
+                --backtrack_mask=False \
+                --save_steps=1000 \
                 --resume_from_checkpoint=$resume \
-                --run_name='backtrack' \
+                --run_name='backtrack_p2' \
                 --output_dir=out \
                 --do_train=$do_train \
                 --do_eval=True \
@@ -143,13 +145,13 @@ done
 
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
-        for combo in "False True 1024" "True False 10000"; do
+        for combo in "False True 1000"; do
             set -- $combo
             resume=$1
             do_train=$2
             num_eval=$3
 
-            CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=arithmetic-dpo WANDB_MODE=online python run.py \
+            CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
                 --seed=$seed \
                 --architecture=llama \
                 --from_pretrained=False \
@@ -176,7 +178,9 @@ for seed in 43; do
                 \
                 \
                 --do_backtrack_decoding=True \
-                --save_total_limit=1 \
+                --backtrack_p=0.2 \
+                --backtrack_mask=True \
+                --save_steps=1000 \
                 --resume_from_checkpoint=$resume \
                 --run_name='backtrack_mask_p2' \
                 --output_dir=out \

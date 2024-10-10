@@ -16,7 +16,7 @@ from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
 
-def get_line(a, b, op=None, format=None, train=None):
+def get_line(a, b, op=None, format=None, train=None, backtrack_p=None, backtrack_mask=None):
     if op == 'add':
         if format == 'reverse':
             return get_reverse_add(a, b)
@@ -47,7 +47,7 @@ def get_line(a, b, op=None, format=None, train=None):
         elif format == 'add1':
             return get_add1(a, b)
         elif format == 'backtrack':
-            return get_reverse_add_backtrack(a, b, mask=True)
+            return get_reverse_add_backtrack(a, b, p=backtrack_p, mask=backtrack_mask)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)
@@ -106,7 +106,9 @@ def data_generator(
     train: bool = True,
     shard: List[int] = None,
     no_sample_set: set = None,
-    seed: int = None
+    seed: int = None, 
+    backtrack_p: float = 0.2,
+    backtrack_mask: bool = False
 ):
     if n_digits_b_range is None:
         n_digits_b_range = n_digits_a_range
@@ -147,7 +149,7 @@ def data_generator(
                 if no_sample_hit > 100:
                     raise ValueError(f'No sample hit {no_sample_hit} times')
                 continue
-            prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
+            prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train, backtrack_p=backtrack_p, backtrack_mask=backtrack_mask)
         if not show_task_ids: 
             prompt = prompt[1:]
 
@@ -253,6 +255,8 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
                 'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
                 'show_task_ids': args.show_task_ids,
                 'seed': train_args.seed,
+                'backtrack_p': args.backtrack_p,
+                'backtrack_mask': args.backtrack_mask,
             },
         )
         ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]})

@@ -56,6 +56,8 @@ class DataArguments:
     use_train_attention_mask: bool = True
     train_pad_to: Optional[int] = None
     eval_pad_to: Optional[int] = None
+    backtrack_p: Optional[float] = 0.2
+    backtrack_mask: Optional[bool] = False
 
     def __post_init__(self):
     #     if self.format.startswith("{"):

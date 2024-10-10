@@ -209,6 +209,9 @@ class DataMixtureSchedulingCallback(TrainerCallback):
         mix = self.init + (self.end - self.init) * step / total_steps
         mix = [r / sum(mix) for r in mix.tolist()]
         kwargs['train_dataloader'].dataset._ex_iterable.probabilities = mix
+    
+    def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
+        logs['data_mixture'] = kwargs['train_dataloader'].dataset._ex_iterable.probabilities
 
 from transformers import Constraint, LogitsProcessor
 

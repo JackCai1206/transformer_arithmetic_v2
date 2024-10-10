@@ -17,7 +17,7 @@ for seed in 42 43 44 45 46; do
         ; do
         CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama-temp-scale \
+            --architecture=llama-lpe \
             --from_pretrained=False \
             --hidden_size=384 \
             --intermediate_size=1536 \
@@ -56,7 +56,7 @@ for seed in 42 43 44 45 46; do
             --warmup_ratio=0.1 \
             --logging_steps=20 \
             --eval_strategy="steps" \
-            --eval_steps=200 \
+            --eval_steps=250 \
             --predict_with_generate \
             --remove_unused_columns=False \
             --eval_on_start=False \

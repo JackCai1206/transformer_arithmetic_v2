@@ -142,8 +142,7 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 # rope_theta=torch.inf
                 rope_theta=model_args.rope_theta,
                 partial_rotary_factor=model_args.partial_rotary_factor,
-                use_rpe=model_args.architecture == 'llama-rpe',
-                scale_logits=model_args.architecture == 'llama-temp-scale',
+                use_lpe=model_args.architecture == 'llama-lpe'
             )
             if model_args.architecture == 'llama-random-pos-id':
                 model_config.k = 256

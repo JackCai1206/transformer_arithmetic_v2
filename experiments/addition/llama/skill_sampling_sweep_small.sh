@@ -7,9 +7,9 @@ set -e
     # 4           8           1200        1          1024            \
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    50          100         1024        1          1024            \
-    20          100         1024        1          1024            \
-    10          100         1024        1          1024            \
+    50          100         512         2          1024            \
+    20          100         512         2          1024            \
+    10          100         512         2          1024            \
     25          50          1024        1          1024            \
     10          50          1024        1          1024            \
     5           50          1024        1          1024            \
@@ -20,7 +20,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                 True True 1024 \
                 True False 10000 \
             ; do
-                CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python run.py \
+                CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=mamba-arithmetic WANDB_RUN_GROUP=sweep-small WANDB_MODE=online python run.py \
                     --seed=$seed \
                     --architecture=llama \
                     --from_pretrained=False \
@@ -38,7 +38,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --op_train='add add add' \
                     --format_train='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_train='1 1 1' \
-                    --n_digits_eval=$((train_high/8))','$((train_high+train_high/4+1))','$((train_high/8)) \
+                    --n_digits_eval=$((train_high/8))','$((train_high+train_high/6+1))','$((train_high/8)) \
                     --op_eval='add add add' \
                     --format_eval='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_eval='1 1 1' \
@@ -63,7 +63,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --warmup_ratio=0.1 \
                     --logging_steps=20 \
                     --eval_strategy="steps" \
-                    --eval_steps=250 \
+                    --eval_steps=500 \
                     --predict_with_generate \
                     --remove_unused_columns=False \
                     --eval_on_start=False \

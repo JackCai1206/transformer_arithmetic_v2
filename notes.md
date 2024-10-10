@@ -6,6 +6,9 @@
   - Test LPE
 2. Ablations 
   - Train on just 1 aux task
+3. LR schedulers
+  - decay only to 0.5 ratio
+  - might wanna test other optimizers
 
 ## Smaller tasks
 - rotate-reverse

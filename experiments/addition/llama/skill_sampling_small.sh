@@ -9,8 +9,8 @@ set -e
     # --max_grad_norm=1 \
     # --warmup_ratio=0.1 \
 
-for seed in 42 43 44 45 46; do
-    for rope_theta in Inf 1e5; do
+for seed in 42; do
+    for rope_theta in Inf; do
         for resume do_train num_eval in \
             False True 1024 \
             True False 10000 \
@@ -49,7 +49,7 @@ for seed in 42 43 44 45 46; do
             --max_steps=15000 \
             --learning_rate=1e-3 \
             --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 9000, "num_decay_steps": 4500}' \
+            --lr_scheduler_kwargs='{"num_stable_steps": 4500, "num_decay_steps": 9000}' \
             --adam_beta2=0.98 \
             --adam_epsilon=1e-12 \
             --weight_decay=0.01 \

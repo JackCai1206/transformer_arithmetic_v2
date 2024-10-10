@@ -85,7 +85,7 @@ def get_reverse_add_cont(a, b):
     s = ''.join(s)
     return f'{a[::-1]}+{b[::-1]}=', s, None
 
-def get_reverse_add_backtrack(a, b, p=0.2):
+def get_reverse_add_backtrack(a, b, p=0.2, mask=False):
     s = str(int(a) + int(b))[::-1]
     l = max(len(a), len(b))
     s = s.ljust(l+1, '0')
@@ -98,7 +98,7 @@ def get_reverse_add_backtrack(a, b, p=0.2):
         while random() < p and len(available) > 0 and len(cot) < 100:
             wrong = available.pop()
             cot += f'{wrong}X'
-            loss_mask += [1, 1] # do we train on the wrong digit? 
+            loss_mask += [0, 1] if mask else [1, 1] # do we train on the wrong digit? 
         cot += s[i]
         loss_mask += [1]
 

@@ -75,3 +75,184 @@ for seed in 43; do
         done
     done
 done
+
+
+# try with cosine lr scheduler
+
+for seed in 43; do
+    for rope_theta in 1e5 Inf; do
+        for combo in "False True 1024" "True False 10000"; do
+            set -- $combo
+            resume=$1
+            do_train=$2
+            num_eval=$3
+
+            CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=arithmetic-dpo WANDB_MODE=online python run.py \
+                --seed=$seed \
+                --architecture=llama \
+                --from_pretrained=False \
+                --hidden_size=384 \
+                --intermediate_size=1536 \
+                --num_attention_heads=6 \
+                --num_layers=6 \
+                --max_position_embeddings=1024 \
+                --rope_theta=$rope_theta \
+                \
+                \
+                --num_train=20000000 \
+                --num_eval=$num_eval \
+                --n_digits_train='1,17' \
+                --op_train='add' \
+                --format_train='backtrack' \
+                --op_dist_train='1' \
+                --n_digits_eval='4,33,4' \
+                --op_eval='add' \
+                --format_eval='reverse' \
+                --op_dist_eval='1' \
+                --show_task_ids=True \
+                --padding_side='right' \
+                \
+                \
+                --do_backtrack_decoding=True \
+                --save_total_limit=1 \
+                --resume_from_checkpoint=$resume \
+                --run_name='backtrack' \
+                --output_dir=out \
+                --do_train=$do_train \
+                --do_eval=True \
+                --max_steps=10000 \
+                --learning_rate=5e-4 \
+                --lr_scheduler_type='cosine' \
+                --warmup_ratio=0.05 \
+                --logging_steps=20 \
+                --eval_strategy="steps" \
+                --eval_steps=200 \
+                --predict_with_generate \
+                --eval_on_start=$resume \
+                --per_device_train_batch_size=1024 \
+                --per_device_eval_batch_size=100\
+                --gradient_accumulation_steps=2 \
+                --include_inputs_for_metrics=True \
+                --torch_compile=True \
+                --bf16=True \
+                --tf32=True 
+        done
+    done
+done
+
+
+for seed in 43; do
+    for rope_theta in 1e5 Inf; do
+        for combo in "False True 1024" "True False 10000"; do
+            set -- $combo
+            resume=$1
+            do_train=$2
+            num_eval=$3
+
+            CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=arithmetic-dpo WANDB_MODE=online python run.py \
+                --seed=$seed \
+                --architecture=llama \
+                --from_pretrained=False \
+                --hidden_size=384 \
+                --intermediate_size=1536 \
+                --num_attention_heads=6 \
+                --num_layers=6 \
+                --max_position_embeddings=1024 \
+                --rope_theta=$rope_theta \
+                \
+                \
+                --num_train=20000000 \
+                --num_eval=$num_eval \
+                --n_digits_train='1,17' \
+                --op_train='add' \
+                --format_train='backtrack' \
+                --op_dist_train='1' \
+                --n_digits_eval='4,33,4' \
+                --op_eval='add' \
+                --format_eval='reverse' \
+                --op_dist_eval='1' \
+                --show_task_ids=True \
+                --padding_side='right' \
+                \
+                \
+                --do_backtrack_decoding=True \
+                --save_total_limit=1 \
+                --resume_from_checkpoint=$resume \
+                --run_name='backtrack_mask_p2' \
+                --output_dir=out \
+                --do_train=$do_train \
+                --do_eval=True \
+                --max_steps=10000 \
+                --learning_rate=5e-4 \
+                --lr_scheduler_type='cosine' \
+                --warmup_ratio=0.05 \
+                --logging_steps=20 \
+                --eval_strategy="steps" \
+                --eval_steps=200 \
+                --predict_with_generate \
+                --eval_on_start=$resume \
+                --per_device_train_batch_size=1024 \
+                --per_device_eval_batch_size=100\
+                --gradient_accumulation_steps=2 \
+                --include_inputs_for_metrics=True \
+                --torch_compile=True \
+                --bf16=True \
+                --tf32=True 
+        done
+    done
+done
+
+
+# Debugging - with beamsearch
+CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=arithmetic-dpo WANDB_MODE=online python run.py \
+    --report_to="none" \
+    --seed=43 \
+    --architecture=llama \
+    --from_pretrained=False \
+    --hidden_size=384 \
+    --intermediate_size=1536 \
+    --num_attention_heads=6 \
+    --num_layers=6 \
+    --max_position_embeddings=1024 \
+    --rope_theta=1e5 \
+    \
+    \
+    --num_train=20000000 \
+    --num_eval=10000 \
+    --n_digits_train='1,17' \
+    --op_train='add' \
+    --format_train='backtrack' \
+    --op_dist_train='1' \
+    --n_digits_eval='4,33,4' \
+    --op_eval='add' \
+    --format_eval='reverse' \
+    --op_dist_eval='1' \
+    --show_task_ids=True \
+    --padding_side='right' \
+    \
+    \
+    --do_backtrack_decoding=True \
+    --num_beams=5 \
+    --early_stopping=True \
+    --save_total_limit=1 \
+    --resume_from_checkpoint=True \
+    --run_name='backtrack' \
+    --output_dir=out \
+    --do_train=False \
+    --do_eval=True \
+    --max_steps=10000 \
+    --learning_rate=5e-4 \
+    --lr_scheduler_type='cosine' \
+    --warmup_ratio=0.05 \
+    --logging_steps=20 \
+    --eval_strategy="steps" \
+    --eval_steps=200 \
+    --predict_with_generate \
+    --eval_on_start=True \
+    --per_device_train_batch_size=1024 \
+    --per_device_eval_batch_size=100\
+    --gradient_accumulation_steps=2 \
+    --include_inputs_for_metrics=True \
+    --torch_compile=True \
+    --bf16=True \
+    --tf32=True 

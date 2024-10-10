@@ -13,7 +13,7 @@ def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction, ar
     # pred = pred[:, :min_len]
     # labels = labels[:, :min_len]
     
-    if args.do_backtrack_decoding:
+    if args.do_backtrack_decoding or args.do_backtrack_eval:
         # we need to clean the backtrack tokens
         backtrack_token_id = tokenizer.backtrack_token_id
         cleaned_pred = np.zeros_like(pred)

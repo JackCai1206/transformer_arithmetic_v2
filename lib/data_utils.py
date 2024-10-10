@@ -47,7 +47,7 @@ def get_line(a, b, op=None, format=None, train=None):
         elif format == 'add1':
             return get_add1(a, b)
         elif format == 'backtrack':
-            return get_reverse_add_backtrack(a, b)
+            return get_reverse_add_backtrack(a, b, mask=True)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)

@@ -41,7 +41,7 @@ def get_tokenizer(model_args: ModelArguments, data_args: DataArguments):
     all_chars = string.ascii_letters + string.digits + string.punctuation + ' ' + '\n'
     tokenizer = CharacterTokenizer(all_chars, model_args.max_position_embeddings)
     tokenizer.padding_side == 'left'
-    tokenizer.backtrack_token_id = tokenizer.convert_tokens_to_ids(['X'])[0]
+    tokenizer.backtrack_token_id = tokenizer.convert_tokens_to_ids(['X'])[0] # use "X" as the backtrack token
 
     if any([x == 'sort' for x in data_args.op_train]):
         added_tokens = tokenizer.add_tokens([f'[{str(i).zfill(2)}]' for i in range(100)])

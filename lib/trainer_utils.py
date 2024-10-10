@@ -17,7 +17,11 @@ from lib.data_utils import PromptAnswerDataCollator
 
 @dataclass
 class MyTrainingArguments(Seq2SeqTrainingArguments):
-    do_backtrack_decoding: bool = False
+    do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
+    do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
+    early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
+    num_beams: Optional[int] = 5 # Number of beams for beam search
+    # num_return_sequences: Optional[int] = 5 # Number of sequences to return for each input
 
 class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):    
     def prediction_step(

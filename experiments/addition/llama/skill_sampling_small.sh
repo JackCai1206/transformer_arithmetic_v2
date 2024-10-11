@@ -14,9 +14,9 @@ for seed in 42 43 44 45 46; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama-lpe \
+            --architecture=llama \
             --from_pretrained=False \
             --hidden_size=384 \
             --intermediate_size=1536 \
@@ -31,7 +31,7 @@ for seed in 42 43 44 45 46; do
             --n_digits_train='1,33 1,33 1,17' \
             --op_train='add add add' \
             --format_train='reverse-no-carry reverse-carry-only reverse' \
-            --op_dist_train='1,1,0 0,0,1' \
+            --op_dist_train='1,1,1' \
             --n_digits_eval='4,49,4' \
             --op_eval='add add add' \
             --format_eval='reverse-no-carry reverse-carry-only reverse' \

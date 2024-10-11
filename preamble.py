@@ -293,6 +293,6 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
     
     if len(data_args.op_dist_train) > 1:
         MixtureCB = DataMixtureSchedulingCallback(init=data_args.op_dist_train[0], end=data_args.op_dist_train[1])
-        trainer.add_callback(MixtureCB)
+        trainer.callback_handler.callbacks.insert(0, MixtureCB)
 
     return trainer

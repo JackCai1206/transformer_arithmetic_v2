@@ -5,7 +5,7 @@ for seed in 42 43 44 45 46; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=mixture WANDB_MODE=disabled python run.py \
             --seed=$seed \
             --architecture=llama-lpe \
             --from_pretrained=False \
@@ -32,7 +32,7 @@ for seed in 42 43 44 45 46; do
             \
             --save_total_limit=1 \
             --resume_from_checkpoint=$resume \
-            --run_name='small' \
+            --run_name='mixture' \
             --output_dir=out \
             --do_train=$do_train \
             --do_eval=True \
@@ -55,7 +55,7 @@ for seed in 42 43 44 45 46; do
             --gradient_accumulation_steps=1 \
             --include_inputs_for_metrics=True \
             --save_steps=500 \
-            --torch_compile=True \
+            --torch_compile=False \
             --bf16=True \
             --tf32=True
         done

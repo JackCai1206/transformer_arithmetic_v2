@@ -261,6 +261,10 @@ def get_train_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments,
         ds_list.append(ds)
 
     init_probs = [frac / sum(args.op_dist_train[0]) for frac in args.op_dist_train[0]]
+    if len(args.op_dist_train) > 1:
+        from multiprocessing import Array
+        from ctypes import c_double
+        init_probs = Array(c_double, init_probs)
     ds = interleave_datasets(ds_list, probabilities=init_probs, seed=train_args.seed, stopping_strategy='all_exhausted')
     # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
     # print(f'Cleaned up: {ds.cleanup_cache_files()}')

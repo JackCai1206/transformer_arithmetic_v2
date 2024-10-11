@@ -7,14 +7,14 @@ set -e
     # 4           8           1200        1          1024            \
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    50          100         512         2          1024            \
     20          100         512         2          1024            \
+    50          100         512         2          1024            \
     10          100         512         2          1024            \
     25          50          1024        1          1024            \
     10          50          1024        1          1024            \
     5           50          1024        1          1024            \
 ; do
-    for seed in 42 43 44 45 46; do
+    for seed in 42 43 44; do
         for rope_theta in 1e5; do
             for resume do_train num_eval in \
                 True True 1024 \

@@ -11,6 +11,7 @@ from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelW
 from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
 from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
+from lib.modeling.llama_temp_softmax import LlamaTempSoftAttnConfig, LlamaForCausalLMTempSoftAttn
 from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments
 from lib.modeling.cat import ConvLlamaForCausalLM
 from lib.modeling.abacus import AbacusLlamaForCausalLM, AbacusLlamaModel, AbacusLlamaConfig
@@ -130,6 +131,20 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
             )
             
             model = LlamaForCausalLMDiffAttn(model_config)
+        elif model_args.architecture == "llama-temp-softmax":
+            model_config = LlamaTempSoftAttnConfig(
+                vocab_size=tokenizer.vocab_size,
+                hidden_size=model_args.hidden_size,
+                intermediate_size=model_args.intermediate_size,
+                num_attention_heads=model_args.num_attention_heads,
+                num_hidden_layers=model_args.num_layers,
+                max_position_embeddings=model_args.max_position_embeddings,
+                _attn_implementation='eager', #'flash_attention_2' if train_args.bf16 else 'sdpa', # TODO: 
+                rope_theta=model_args.rope_theta,
+                partial_rotary_factor=model_args.partial_rotary_factor,                
+            )
+            model = LlamaForCausalLMTempSoftAttn(model_config)
+
         elif model_args.architecture.startswith("llama"):
             model_config = MyLlamaConfig(
                 vocab_size=tokenizer.vocab_size,
@@ -209,7 +224,7 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
 def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
     train_args.generation_config = GenerationConfig(
         do_sample=False,
-        num_beams=1,
+        num_beams=1, # chhange in prediction_step (in trainer_utils - Seq2SeqTrainerNoEvalLoss)
         pad_token_id=tokenizer.pad_token_id,
         eos_token_id=tokenizer.eos_token_id,
         bos_token_id=tokenizer.bos_token_id,
@@ -263,7 +278,7 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     
     if not train_args.do_train:
         train_args.run_name += '-eval'
-
+    
     return train_args
 
 def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: ModelArguments, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, train_args: MyTrainingArguments, train_dataset: Dataset, eval_datasets: Dataset):

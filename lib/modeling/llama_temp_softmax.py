@@ -117,7 +117,7 @@ class LlamaTempSoftAttn(LlamaAttention):
         scaling_factors = scaling_factors.view(1, 1, 1, q_len)  # Shape: (1, 1, 1, q_len)
 
         # Scale the attention weights with T
-        attn_weights = attn_weights / scaling_factors  # Scale the logits # TODO: check if this should be division or multiplication
+        attn_weights = attn_weights * scaling_factors  # Scale the logits # TODO: check if this should be division or multiplication -> it is multiplication
 
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype) 

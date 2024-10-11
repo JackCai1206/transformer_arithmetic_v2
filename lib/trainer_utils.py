@@ -20,6 +20,7 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
     do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
+    do_beam_search: Optional[bool] = False # Use beam search during generation
     num_beams: Optional[int] = 1 # Number of beams for beam search
     # num_return_sequences: Optional[int] = 5 # Number of sequences to return for each input
 
@@ -95,6 +96,10 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
 
         loss_mask = generation_inputs['loss_mask']
         del generation_inputs['loss_mask']
+        if self.args.do_beam_search:
+            gen_kwargs['num_beams'] = self.args.num_beams
+            assert self.args.num_beams > 1, "num_beams must be greater than 1 for beam search"
+            gen_kwargs['early_stopping'] = self.args.early_stopping
         if self.args.do_backtrack_decoding:
             backtrack_tok = self.tokenizer.backtrack_token_id
             logits_processor = BacktrackLogitsProcessor(generation_inputs['labels'], backtrack_tok, eos_tok=self.tokenizer.eos_token_id)
@@ -263,6 +268,11 @@ class BacktrackLogitsProcessor(LogitsProcessor):
         self.label_count = torch.zeros(labels.shape[0], dtype=torch.long)
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        # if input_ids.shape[0] != self.labels.shape[0] (in the case of beam search), we repeat the labels
+        if input_ids.shape[0] != self.labels.shape[0]:
+            self.labels = self.labels.repeat_interleave(input_ids.shape[0] // self.labels.shape[0], dim=0)
+            self.label_count = self.label_count.repeat_interleave(input_ids.shape[0] // self.label_count.shape[0], dim=0)
+
         if self.count > 0:
             labels = self.labels[torch.arange(self.labels.shape[0]), self.label_count.clip(max=self.labels.shape[1]-1)]
             input_ids = input_ids[:, -1]

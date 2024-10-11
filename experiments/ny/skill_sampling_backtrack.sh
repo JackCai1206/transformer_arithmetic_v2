@@ -208,6 +208,8 @@ done
 
 
 
+
+
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
         for combo in "False True 1000"; do

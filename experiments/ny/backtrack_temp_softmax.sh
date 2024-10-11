@@ -328,13 +328,13 @@ CUDA_VISIBLE_DEVICES=1 python run.py \
 ####################
 for seed in 43; do
     for rope_theta in Inf; do
-        for combo in "False True 1000"; do
+        for combo in "False True 100"; do
             set -- $combo
             resume=$1
             do_train=$2
             num_eval=$3
 
-            CUDA_VISIBLE_DEVICES=0 WANDB_MODE='disabled' python run.py \
+            CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online python run.py \
                 --seed=$seed \
                 --architecture=llama-temp-softmax \
                 --from_pretrained=False \

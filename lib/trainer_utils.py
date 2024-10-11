@@ -15,6 +15,8 @@ from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from lib.data_utils import PromptAnswerDataCollator
 
+import wandb
+
 @dataclass
 class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
@@ -23,6 +25,7 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_beam_search: Optional[bool] = False # Use beam search during generation
     num_beams: Optional[int] = 1 # Number of beams for beam search
     # num_return_sequences: Optional[int] = 5 # Number of sequences to return for each input
+    log_beta: Optional[bool] = False # Log beta values to wandb
 
 class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):    
     def prediction_step(
@@ -183,6 +186,19 @@ class AddWandbConfigCallback(WandbCallback):
         super().setup(args, state, model, **kwargs)
         new_config = reduce(lambda x, y: {**x, **y}, self.extra_configs)
         self._wandb.config.update(new_config, allow_val_change=True)
+
+class CustomParameterLoggingCallback(TrainerCallback):
+    def __init__(self, model):
+        self.model = model.model 
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        # Let's log beta values
+        beta_i_dict = {}
+        for i in range(len(self.model.layers)):
+            beta_i = self.model.layers[i].self_attn.temp_beta.detach().cpu()
+            beta_i_dict[f"layer{i}_beta_value"] = beta_i.item()
+            wandb.log({f"layer{i}_beta_value": beta_i})
+        print(beta_i_dict)
 
 class EarlyStoppingCallback(TrainerCallback):
     def __init__(self, metric_name, threshold, patience):

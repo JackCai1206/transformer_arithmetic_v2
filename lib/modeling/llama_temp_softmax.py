@@ -104,14 +104,23 @@ class LlamaTempSoftAttn(LlamaAttention):
             attn_weights = attn_weights + causal_mask
 
 
+        #############################################################################################
         # #NOTE: for attn_weights, apply softmax with temperature parameter by multiplying each with T = beta log n
         # where n is the length of the input sequence
+        #############################################################################################
+        # Compute the scaling factor T for each position
+        position_indices = torch.arange(1, q_len + 1, device=hidden_states.device).float()  # [1, 2, ..., q_len]
+        scaling_factors = self.temp_beta * torch.log(position_indices)  # Compute T = beta * log(i)
 
-        T = self.temp_beta * torch.log(torch.tensor(q_len).float())
-        attn_weights = T * attn_weights
+        # Reshape scaling_factors to be compatible with attn_weights
+        # We want to scale across the last dimension (q_len), so we reshape it accordingly
+        scaling_factors = scaling_factors.view(1, 1, 1, q_len)  # Shape: (1, 1, 1, q_len)
+
+        # Scale the attention weights with T
+        attn_weights = attn_weights / scaling_factors  # Scale the logits # TODO: check if this should be division or multiplication
 
         # upcast attention to fp32
-        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype) # TODO: THIS PART IS CHANGED
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype) 
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
 

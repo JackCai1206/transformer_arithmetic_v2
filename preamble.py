@@ -12,7 +12,7 @@ from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
 from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
 from lib.modeling.llama_temp_softmax import LlamaTempSoftAttnConfig, LlamaForCausalLMTempSoftAttn
-from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments
+from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments, CustomParameterLoggingCallback
 from lib.modeling.cat import ConvLlamaForCausalLM
 from lib.modeling.abacus import AbacusLlamaForCausalLM, AbacusLlamaModel, AbacusLlamaConfig
 from charactertokenizer import CharacterTokenizer
@@ -279,6 +279,9 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     if not train_args.do_train:
         train_args.run_name += '-eval'
     
+    if model_args.architecture == 'llama-temp-softmax':
+        train_args.log_beta = True
+    
     return train_args
 
 def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: ModelArguments, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, train_args: MyTrainingArguments, train_dataset: Dataset, eval_datasets: Dataset):
@@ -305,5 +308,9 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
     if train_args.metric_for_best_model is not None:
         EarlyStoppingCB = EarlyStoppingCallback(metric_name=train_args.metric_for_best_model, threshold=0.99, patience=1)
         trainer.add_callback(EarlyStoppingCB)
+
+    if train_args.log_beta:
+        CustomParameterLoggingCB = CustomParameterLoggingCallback(model)
+        trainer.add_callback(CustomParameterLoggingCB)
 
     return trainer

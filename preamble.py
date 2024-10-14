@@ -151,7 +151,6 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
 
         elif model_args.architecture.startswith("llama"):
             model_config = MyLlamaConfig(
-            model_config = MyLlamaConfig(
                 vocab_size=tokenizer.vocab_size,
                 hidden_size=model_args.hidden_size,
                 intermediate_size=model_args.intermediate_size,
@@ -308,7 +307,6 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         )
     )
 
-    if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
     if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
         AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
         trainer.add_callback(AddConfigCB)

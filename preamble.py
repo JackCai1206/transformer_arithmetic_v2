@@ -10,6 +10,8 @@ from lib.eval_utils import compute_metrics
 from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelWithAddRules
 from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
 from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
+from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
+from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
 from lib.modeling.llama_temp_softmax import LlamaTempSoftAttnConfig, LlamaForCausalLMTempSoftAttn
 from lib.trainer_utils import AddWandbConfigCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments, CustomParameterLoggingCallback
@@ -141,11 +143,14 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 max_position_embeddings=model_args.max_position_embeddings,
                 _attn_implementation='eager', #'flash_attention_2' if train_args.bf16 else 'sdpa', # TODO: 
                 rope_theta=model_args.rope_theta,
-                partial_rotary_factor=model_args.partial_rotary_factor,                
+                partial_rotary_factor=model_args.partial_rotary_factor,
+                # temp_beta=model_args.temp_beta,
+                fix_beta=model_args.fix_beta                
             )
             model = LlamaForCausalLMTempSoftAttn(model_config)
 
         elif model_args.architecture.startswith("llama"):
+            model_config = MyLlamaConfig(
             model_config = MyLlamaConfig(
                 vocab_size=tokenizer.vocab_size,
                 hidden_size=model_args.hidden_size,
@@ -156,6 +161,8 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 _attn_implementation='flash_attention_2' if train_args.bf16 else 'sdpa',
                 # rope_theta=torch.inf
                 rope_theta=model_args.rope_theta,
+                partial_rotary_factor=model_args.partial_rotary_factor,
+                use_rpe=model_args.architecture == 'llama-rpe'
                 partial_rotary_factor=model_args.partial_rotary_factor,
                 use_rpe=model_args.architecture == 'llama-rpe'
             )
@@ -301,6 +308,7 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         )
     )
 
+    if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
     if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
         AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
         trainer.add_callback(AddConfigCB)

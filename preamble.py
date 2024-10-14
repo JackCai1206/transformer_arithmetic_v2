@@ -161,9 +161,7 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 # rope_theta=torch.inf
                 rope_theta=model_args.rope_theta,
                 partial_rotary_factor=model_args.partial_rotary_factor,
-                use_rpe=model_args.architecture == 'llama-rpe'
-                partial_rotary_factor=model_args.partial_rotary_factor,
-                use_rpe=model_args.architecture == 'llama-rpe'
+                use_rpe=model_args.architecture == 'llama-rpe',
             )
             if model_args.architecture == 'llama-random-pos-id':
                 model_config.k = 256
@@ -257,7 +255,6 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     translator = str.maketrans('/,', '__', ''.join(set(string.punctuation + string.whitespace) - set('/,_-')))
     train_args.run_name = str.translate(train_args.run_name, translator)
 
-    train_args.output_dir = f"out/{train_args.run_name}"
     train_args.save_safetensors = False # supposed to fix "There were missing keys in the checkpoint model loaded: ['lm_head.weight']."
     train_args.dataloader_num_workers = data_args.nproc
     train_args.dataloader_prefetch_factor = 3
@@ -284,6 +281,8 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     
     if not train_args.do_train:
         train_args.run_name += '-eval'
+
+    train_args.output_dir = f"out/{train_args.run_name}"
     
     if model_args.architecture == 'llama-temp-softmax':
         train_args.log_beta = True

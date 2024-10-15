@@ -164,8 +164,12 @@ def data_generator(
             'task_id': task_id
         }
 
-def get_dataset_display_name(n_digits, op, format):
-    return f'{n_digits}-{op}-{format}'
+def get_dataset_display_name(n_digits, op, format, max_digits):
+    if n_digits <= max_digits:
+        prefix = 'ID'
+    else:
+        prefix = 'OOD'
+    return f'{prefix}-{n_digits}-{op}-{format}'
 
 def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer, no_sample_from: dict[str, Dataset]=None):
     def add_special_tokens(batch, add_eos=True):
@@ -232,6 +236,8 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
         no_sample_from[key] = no_sample_from[key].to_dict()
         no_sample_from[key]['prompt'] = set(no_sample_from[key]['prompt']) # convert to set for faster lookup
 
+    max_train_digits = max(range(*args.n_digits_train[i]).stop for i in range(len(args.op_train)))
+
     def filter_eval(example, op=None, format=None):
         if example['n_digits'][0] != example['n_digits'][1]:
             # We don't sample asymmetric examples in test, so these are definitely good
@@ -239,7 +245,8 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
         elif example['n_digits'][0] < 8:
             # We cannot avoid repeating examples with low n_digits
             return True
-        key = get_dataset_display_name(example['n_digits'][0], op, format)
+        
+        key = get_dataset_display_name(example['n_digits'][0], op, format, max_train_digits)
         if key not in no_sample_from:
             return True
         return example['prompt'] not in no_sample_from[key]['prompt']
@@ -361,13 +368,14 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                     cache_dir=eval_file,
                     split='test'
                 )
+                ds0.cleanup_cache_files()
                 # for f in ds0.cache_files:
                 #     shutil.rmtree(os.path.dirname(f['filename']))
                 # ds0.save_to_disk(eval_file) 
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
             ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'n_digits', 'loss_mask', 'task_id'])
-
-            key = get_dataset_display_name(n_digits, args.op_eval[opi], args.format_eval[opi])
+            max_train_digits = max(range(*args.n_digits_train[i]).stop for i in range(len(args.op_train)))
+            key = get_dataset_display_name(n_digits, args.op_eval[opi], args.format_eval[opi], max_train_digits)
             ds_list[key] = ds
             unmapped_ds_list[key] = ds0
             # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')

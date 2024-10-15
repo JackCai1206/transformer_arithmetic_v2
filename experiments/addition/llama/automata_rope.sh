@@ -23,7 +23,7 @@ for seed in 42 43 44 45 46; do
             --n_digits_train='1,17 1,33 1,9' \
             --op_train='add add add' \
             --format_train='automata_A automata_B automata_C' \
-            --op_dist_train='1 1 1' \
+            --op_dist_train='1,1,1' \
             --n_digits_eval='4,49,4' \
             --op_eval='add add add' \
             --format_eval='automata_A automata_B automata_C' \

@@ -3,7 +3,7 @@ from transformers.integrations import WandbCallback
 import Levenshtein
 import numpy as np
 
-from lib.trainer_utils import MyTrainingArguments
+from lib.configs import MyTrainingArguments
 
 def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction, args: MyTrainingArguments):
     pred = pred_obj.predictions[:, pred_obj.inputs.shape[1]:]

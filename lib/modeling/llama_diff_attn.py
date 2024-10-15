@@ -16,7 +16,7 @@ class LlamaDiffAttnConfig(LlamaConfig):
 
 class LlamaDiffAttn(LlamaAttention):
     def __init__(self, config: LlamaConfig, layer_idx: Optional[int] = None):
-        super().__init__(config)
+        super().__init__(config, layer_idx)
         self.lambda_init = lambda_init_fn(self.config.num_hidden_layers)
         self.lambda_q1 = nn.Parameter(torch.zeros(self.head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
         self.lambda_k1 = nn.Parameter(torch.zeros(self.head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
@@ -24,6 +24,8 @@ class LlamaDiffAttn(LlamaAttention):
         self.lambda_k2 = nn.Parameter(torch.zeros(self.head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
 
         self.subln = RMSNorm(2 * self.head_dim, eps=1e-5, elementwise_affine=False)
+        
+        self.head_dim = self.hidden_size // self.num_heads // 2
     
     def forward(
         self,
@@ -91,15 +93,15 @@ class LlamaDiffAttn(LlamaAttention):
         lambda_1 = torch.exp(torch.sum(self.lambda_q1 * self.lambda_k1, dim=-1).float()).type_as(query_states)
         lambda_2 = torch.exp(torch.sum(self.lambda_q2 * self.lambda_k2, dim=-1).float()).type_as(query_states)
         lambda_full = lambda_1 - lambda_2 + self.lambda_init
-        attn_weights = attn_weights.view(bsz, self.num_heads, 2, q_len, q_len)
+        attn_weights = attn_weights.view(bsz, self.num_heads, 2, attn_weights.shape[-2], attn_weights.shape[-1])
         attn_weights = attn_weights[:, :, 0] - lambda_full * attn_weights[:, :, 1]
 
         attn_output = torch.matmul(attn_weights, value_states)
         attn_output = self.subln(attn_output)
 
-        if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+        if attn_output.size() != (bsz, self.num_heads, q_len, 2 * self.head_dim):
             raise ValueError(
-                f"`attn_output` should be of size {(bsz, self.num_heads, q_len, self.head_dim)}, but is"
+                f"`attn_output` should be of size {(bsz, self.num_heads, q_len, 2 * self.head_dim)}, but is"
                 f" {attn_output.size()}"
             )
 

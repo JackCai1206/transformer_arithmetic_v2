@@ -24,7 +24,7 @@ for from_pretrained use_lora max_steps eval_steps in \
         --n_digits_train='1,33 1,33 1,17' \
         --op_train='sort sort sort' \
         --format_train='min set_diff sort' \
-        --op_dist_train='1 1 1' \
+        --op_dist_train='1,1,1' \
         --n_digits_eval='4,33,4' \
         --op_eval='sort sort sort' \
         --format_eval='min set_diff sort' \

@@ -32,7 +32,7 @@ for seed in 42 43 44 45 46; do
             --n_digits_train='1,21 1,21 1,11' \
             --op_train='add add add' \
             --format_train='reverse-no-carry reverse-carry-only reverse' \
-            --op_dist_train='1 1 1' \
+            --op_dist_train='1,1,1' \
             --n_digits_eval='10,121,10' \
             --op_eval='add add add' \
             --format_eval='reverse-no-carry reverse-carry-only reverse' \

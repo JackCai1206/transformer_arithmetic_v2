@@ -10,14 +10,13 @@ set -e
     # --warmup_ratio=0.1 \
 
 for seed in 42 43 44 45 46; do
-    for rope_theta in Inf 1e5; do
+    for rope_theta in Inf; do
         for resume do_train num_eval in \
             False True 1024 \
-            True False 10000 \
         ; do
         CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=base WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama-rpe \
+            --architecture=llama-lpe \
             --from_pretrained=False \
             --hidden_size=768 \
             --intermediate_size=1536 \
@@ -32,7 +31,7 @@ for seed in 42 43 44 45 46; do
             --n_digits_train='1,33 1,33 1,17' \
             --op_train='add add add' \
             --format_train='reverse-no-carry reverse-carry-only reverse' \
-            --op_dist_train='1 1 1' \
+            --op_dist_train='1,1,0 0,0,1' \
             --n_digits_eval='4,49,4' \
             --op_eval='add add add' \
             --format_eval='reverse-no-carry reverse-carry-only reverse' \
@@ -49,8 +48,8 @@ for seed in 42 43 44 45 46; do
             --do_eval=True \
             --max_steps=10000 \
             --learning_rate=5e-4 \
-            --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 8000, "num_decay_steps": 1000}' \
+            --lr_scheduler_type='cosine_with_min_lr' \
+            --lr_scheduler_kwargs='{"min_lr_rate": 0.5}' \
             --adam_beta2=0.98 \
             --adam_epsilon=1e-12 \
             --weight_decay=0.01 \

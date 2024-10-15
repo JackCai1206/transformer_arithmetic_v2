@@ -15,7 +15,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=mamba-arithmetic WANDB_MODE=online python r
     --n_digits_train='1,64 1,64 1,32' \
     --op_train='add add add' \
     --format_train='reverse-no-carry reverse-carry-only reverse' \
-    --op_dist_train='1 1 1' \
+    --op_dist_train='1,1,1' \
     --n_digits_eval='8,65,8' \
     --op_eval='add add add' \
     --format_eval='reverse-no-carry reverse-carry-only reverse' \

@@ -6,14 +6,20 @@ from transformers.models.falcon.modeling_falcon import FalconRotaryEmbedding
 from transformers.models.llama.modeling_llama import BaseModelOutputWithPast, LlamaModel
 from transformers.cache_utils import DynamicCache, Cache
 
+from .llama_attn import LlamaAttentionTempScale
+
 class MyLlamaConfig(LlamaConfig):
     use_lpe: bool = False
+    scale_logits: bool = False
 
 class LlamaModelWithNoPE(LlamaModel):
     def __init__(self, config: LlamaConfig):
         super().__init__(config)
         if config.use_lpe:
             self.positional_embeddings = torch.nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        if config.scale_logits:
+            for layer, i in zip(self.layers, range(len(self.layers))):
+                layer.self_attn = LlamaAttentionTempScale(config, layer_idx=i)
 
     def forward(
         self,
@@ -84,7 +90,6 @@ class LlamaModelWithNoPE(LlamaModel):
             position_embeddings[1][:, :, :rotary_dim] = sin
         if self.config.use_lpe:
             lpe = self.positional_embeddings(position_ids)
-            breakpoint()
             hidden_states = hidden_states + lpe
 
         # decoder layers

@@ -16,6 +16,7 @@ for seed in 42; do
             --num_layers=6 \
             --max_position_embeddings=1024 \
             --rope_theta=$rope_theta \
+            --partial_rotary_factor=0.5 \
             \
             \
             --num_train=20000000 \
@@ -49,13 +50,13 @@ for seed in 42; do
             --eval_steps=200 \
             --predict_with_generate \
             --remove_unused_columns=False \
-            --eval_on_start=False \
+            --eval_on_start=True \
             --per_device_train_batch_size=1024 \
             --per_device_eval_batch_size=1024 \
             --gradient_accumulation_steps=1 \
             --include_inputs_for_metrics=True \
             --save_steps=500 \
-            --torch_compile=True \
+            --torch_compile=False \
             --bf16=False \
             --tf32=True
         done

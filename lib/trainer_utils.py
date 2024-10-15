@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial, reduce
 from datasets import Dataset
@@ -10,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Un
 
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
+import numpy as np
 
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
@@ -17,17 +20,33 @@ from lib.data_utils import PromptAnswerDataCollator
 
 import wandb
 
-@dataclass
-class MyTrainingArguments(Seq2SeqTrainingArguments):
-    do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
-    do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
-    early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
-    do_beam_search: Optional[bool] = False # Use beam search during generation
-    num_beams: Optional[int] = 1 # Number of beams for beam search
-    # num_return_sequences: Optional[int] = 5 # Number of sequences to return for each input
-    log_beta: Optional[bool] = False # Log beta values to wandb
+class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
+    num_tokens_seen = defaultdict(int)
 
-class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):    
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        if self.args.track_num_tokens_seen_by_task:
+            task_ids = inputs.pop('task_id')
+            for tid in task_ids.unique():
+                main_input = inputs['input_ids'][task_ids == tid]
+                attn_mask = inputs['attention_mask'][task_ids == tid]
+                self.num_tokens_seen[tid.item()] += (
+                    torch.sum(
+                        self.accelerator.gather(
+                            torch.tensor(
+                                main_input.numel(), device=self.args.device, dtype=torch.int64
+                            ) - torch.sum(attn_mask)
+                        )
+                    )
+                    .cpu()
+                    .item()
+                )
+        return super().training_step(model, inputs)
+    
+    def log(self, logs: Dict[str, float]) -> None:
+        if self.args.track_num_tokens_seen_by_task:
+            logs |= {f'tokens_seen_{tid}': self.num_tokens_seen[tid] for tid in self.num_tokens_seen}
+        return super().log(logs)
+    
     def prediction_step(
         self,
         model: nn.Module,
@@ -200,16 +219,25 @@ class CustomParameterLoggingCallback(TrainerCallback):
             wandb.log({f"layer{i}_beta_value": beta_i})
         print(beta_i_dict)
 
+import re
+
 class EarlyStoppingCallback(TrainerCallback):
-    def __init__(self, metric_name, threshold, patience):
+    def __init__(self, metric_names, thresholds, patience):
         self.patience_counter = patience
-        self.metric_name = metric_name
-        self.threshold = threshold
+        self.metric_names = metric_names
+        self.thresholds = thresholds
         self.patience = patience
 
     def should_stop(self, state, metrics):
-        if self.metric_name in metrics and metrics[self.metric_name] >= self.threshold:
+        matched_keys_list = [
+            [ key for key in metrics.keys() if re.search(metric_name, key) ]
+        for metric_name in self.metric_names ]
+        if all(
+            all(metrics[key] >= threshold for key in matched_keys)
+            for matched_keys, threshold in zip(matched_keys_list, self.thresholds)
+        ):
             self.patience_counter -= 1
+        breakpoint()
 
         return self.patience_counter <= 0
 
@@ -220,6 +248,32 @@ class EarlyStoppingCallback(TrainerCallback):
     #     if state.total_flos >= 511_920_053_762_457_600:
     #         control.should_training_stop = True
     #         control.should_evaluate = True
+
+class DataMixtureSchedulingCallback(TrainerCallback):
+    def __init__(self, init, end, schedule='cosine', wait_before=0, wait_after=0.3):
+        self.init = np.array(init)
+        self.end = np.array(end)
+        self.schedule = schedule
+        self.wait_before = wait_before
+        self.wait_after = wait_after
+    
+    def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        wait_before = self.wait_before * args.max_steps
+        wait_after = self.wait_after * args.max_steps
+        total_steps = max(1, args.max_steps - wait_before - wait_after)
+        step = np.clip(state.global_step - wait_before, 0, total_steps)
+        if self.schedule == 'linear':
+            mix = self.init + (self.end - self.init) * step / total_steps
+        elif self.schedule == 'cosine':
+            mix = self.end + (self.init - self.end) * (1 + np.cos(np.pi * step / total_steps)) / 2
+
+        mix = mix / mix.sum()
+        mix[np.argmax(mix)] += 1 - mix.sum()
+        kwargs['train_dataloader'].dataset._ex_iterable.probabilities[:] = mix
+
+    def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
+        mix = kwargs['train_dataloader'].dataset._ex_iterable.probabilities
+        logs |= {f'mix_{i}': round(p, 3) for i, p in enumerate(mix)}
 
 from transformers import Constraint, LogitsProcessor
 

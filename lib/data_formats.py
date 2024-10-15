@@ -74,7 +74,7 @@ def get_reverse_add(a, b):
     s = str(int(a) + int(b))[::-1]
     l = max(len(a), len(b))
     s = s.ljust(l+1, '0')
-    return f'{a[::-1]}+{b[::-1]}=', s, None
+    return f'C{a[::-1]}+{b[::-1]}=', s, None
 
 def get_reverse_add_cont(a, b):
     s = list(str(int(a) + int(b)))[::-1]
@@ -103,7 +103,7 @@ def get_reverse_add_backtrack(a, b, p=0.2, mask=False):
         loss_mask += [1]
 
     assert len(cot) == len(loss_mask), (len(s), len(cot), len(loss_mask))
-    return f'{a[::-1]}+{b[::-1]}=', cot, loss_mask
+    return f'C{a[::-1]}+{b[::-1]}=', cot, loss_mask
 
 def get_forward(a, b):
     s = str(int(a) + int(b))

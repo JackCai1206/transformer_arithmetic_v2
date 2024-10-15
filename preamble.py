@@ -145,7 +145,8 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 rope_theta=model_args.rope_theta,
                 partial_rotary_factor=model_args.partial_rotary_factor,
                 # temp_beta=model_args.temp_beta,
-                fix_beta=model_args.fix_beta                
+                fix_beta=model_args.fix_beta,
+                attention_dropout=model_args.attention_dropout,                
             )
             model = LlamaForCausalLMTempSoftAttn(model_config)
 
@@ -162,6 +163,7 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 rope_theta=model_args.rope_theta,
                 partial_rotary_factor=model_args.partial_rotary_factor,
                 use_rpe=model_args.architecture == 'llama-rpe',
+                attention_dropout=model_args.attention_dropout,                
             )
             if model_args.architecture == 'llama-random-pos-id':
                 model_config.k = 256

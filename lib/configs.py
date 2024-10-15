@@ -28,6 +28,8 @@ class ModelArguments:
     max_position_embeddings: Optional[int] = 1024
     freeze: Optional[str] = None
     freeze_except: Optional[str] = None
+    fix_beta: Optional[bool] = False
+    attention_dropout: Optional[float] = 0.0
 
     def __post_init__(self):
         if self.intermediate_size is None:

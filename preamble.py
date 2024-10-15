@@ -4,14 +4,14 @@ import string
 from functools import partial
 
 import torch
-from lib.configs import ScriptArguments, ModelArguments, DataArguments
+from lib.configs import ScriptArguments, ModelArguments, DataArguments, MyTrainingArguments
 from lib.data_utils import get_train_dataset, get_eval_dataset, PromptAnswerDataCollator
 from lib.eval_utils import compute_metrics
 from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelWithAddRules
 from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
 from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
 from lib.modeling.llama_rand_pos_id import LlamaRandPosId
-from lib.trainer_utils import AddWandbConfigCallback, DataMixtureSchedulingCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss, MyTrainingArguments
+from lib.trainer_utils import AddWandbConfigCallback, DataMixtureSchedulingCallback, EarlyStoppingCallback, Seq2SeqTrainerNoEvalLoss
 from lib.modeling.cat import ConvLlamaForCausalLM
 from lib.modeling.abacus import AbacusLlamaForCausalLM, AbacusLlamaModel, AbacusLlamaConfig
 from charactertokenizer import CharacterTokenizer
@@ -142,7 +142,8 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
                 # rope_theta=torch.inf
                 rope_theta=model_args.rope_theta,
                 partial_rotary_factor=model_args.partial_rotary_factor,
-                use_lpe=model_args.architecture == 'llama-lpe'
+                use_lpe=model_args.architecture == 'llama-lpe',
+                attention_dropout=model_args.dropout
             )
             if model_args.architecture == 'llama-random-pos-id':
                 model_config.k = 256
@@ -239,7 +240,7 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     train_args.output_dir = f"out/{train_args.run_name}"
     train_args.save_safetensors = False # supposed to fix "There were missing keys in the checkpoint model loaded: ['lm_head.weight']."
     train_args.dataloader_num_workers = data_args.nproc
-    train_args.dataloader_prefetch_factor = 3
+    train_args.dataloader_prefetch_factor = 16
     train_args.remove_unused_columns = False
     
     if train_args.resume_from_checkpoint == 'True':
@@ -292,7 +293,7 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         trainer.add_callback(EarlyStoppingCB)
     
     if len(data_args.op_dist_train) > 1:
-        MixtureCB = DataMixtureSchedulingCallback(init=data_args.op_dist_train[0], end=data_args.op_dist_train[1])
-        trainer.add_callback(MixtureCB)
+        MixtureCB = DataMixtureSchedulingCallback(init=data_args.op_dist_train[0], end=data_args.op_dist_train[1], **data_args.mixture_scheduling_kwargs)
+        trainer.callback_handler.callbacks.insert(0, MixtureCB)
 
     return trainer

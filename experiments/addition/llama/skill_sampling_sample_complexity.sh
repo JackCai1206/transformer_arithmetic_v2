@@ -11,10 +11,10 @@ for num_train in 2500 5000 7500 10000 50000; do
                 --seed=$seed \
                 --architecture=llama \
                 --from_pretrained=False \
-                --hidden_size=768 \
+                --hidden_size=384 \
                 --intermediate_size=1536 \
-                --num_attention_heads=12 \
-                --num_layers=12 \
+                --num_attention_heads=6 \
+                --num_layers=6 \
                 --max_position_embeddings=1024 \
                 --rope_theta=$rope_theta \
                 \

@@ -10,10 +10,10 @@ for num_train in 10000 20000 30000 40000 50000; do
                 --seed=$seed \
                 --architecture=llama \
                 --from_pretrained=False \
-                --hidden_size=768 \
+                --hidden_size=384 \
                 --intermediate_size=1536 \
-                --num_attention_heads=12 \
-                --num_layers=12 \
+                --num_attention_heads=6 \
+                --num_layers=6 \
                 --max_position_embeddings=1024 \
                 --rope_theta=$rope_theta \
                 \
@@ -21,7 +21,7 @@ for num_train in 10000 20000 30000 40000 50000; do
                 --nproc=1 \
                 --num_train=$num_train \
                 --num_eval=$num_eval \
-                --n_digits_train='1,17' \
+                --n_digits_train='1,33' \
                 --op_train='add' \
                 --format_train='reverse' \
                 --op_dist_train='1' \

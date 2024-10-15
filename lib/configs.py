@@ -3,6 +3,12 @@ import json
 from typing import Optional, Tuple, Union
 from trl import DPOConfig
 import numpy as np
+from transformers import Seq2SeqTrainingArguments
+
+@dataclass
+class MyTrainingArguments(Seq2SeqTrainingArguments):
+    do_backtrack_decoding: bool = False
+    track_num_tokens_seen_by_task: bool = False
 
 @dataclass
 class ScriptArguments:
@@ -25,6 +31,7 @@ class ModelArguments:
     max_position_embeddings: Optional[int] = 1024
     freeze: Optional[str] = None
     freeze_except: Optional[str] = None
+    dropout: Optional[float] = 0.0
 
     def __post_init__(self):
         if self.intermediate_size is None:
@@ -32,6 +39,7 @@ class ModelArguments:
 
 @dataclass
 class DataArguments:
+    use_iterable_dataset: bool = True
     num_train: Optional[Union[Tuple[Tuple[int]], str]] = '20_000_000'
     num_eval: int = 100
     eval_samples_file: str = 'data'
@@ -53,6 +61,7 @@ class DataArguments:
     use_train_attention_mask: bool = True
     train_pad_to: Optional[int] = None
     eval_pad_to: Optional[int] = None
+    mixture_scheduling_kwargs: Optional[Union[dict, str]] = field(default_factory=dict)
 
     def __post_init__(self):
     #     if self.format.startswith("{"):
@@ -71,3 +80,4 @@ class DataArguments:
         self.n_digits_eval = tuple(map(int, self.n_digits_eval.split(',')))
         self.n_digits_dpo = tuple(map(int, self.n_digits_dpo.split(',')))
         # assert len(self.op_eval) == len(self.op_dist_eval) == len(self.format_eval) == len(self.n_digits_eval), 'You must provide the same number of values for op_eval, op_dist_eval, format_eval, and n_digits_eval'
+        self.mixture_scheduling_kwargs = json.loads(self.mixture_scheduling_kwargs) if isinstance(self.mixture_scheduling_kwargs, str) else self.mixture_scheduling_kwargs

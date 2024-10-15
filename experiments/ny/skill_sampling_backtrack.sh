@@ -79,6 +79,7 @@ done
 
 # try with cosine lr scheduler
 
+# p=0.2, without mask
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
         for combo in "False True 1000"; do
@@ -143,6 +144,7 @@ for seed in 43; do
 done
 
 
+# p=0.2, with mask
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
         for combo in "False True 1000"; do
@@ -208,8 +210,7 @@ done
 
 
 
-
-
+# p=0.5, without mask
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
         for combo in "False True 1000"; do
@@ -274,7 +275,7 @@ for seed in 43; do
 done
 
 
-
+# p=0.5, with mask
 for seed in 43; do
     for rope_theta in 1e5 Inf; do
         for combo in "False True 1000"; do

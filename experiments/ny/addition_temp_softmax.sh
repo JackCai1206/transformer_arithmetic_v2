@@ -16,7 +16,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
     --format_eval='reverse' \
     \
     \
-    --run_name='reverse' \
+    --run_name='reverse_ts' \
     --output_dir=out \
     --do_train=True \
     --do_eval=True \
@@ -54,7 +54,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
     --format_eval='reverse' \
     \
     \
-    --run_name='reverse' \
+    --run_name='reverse_ts' \
     --output_dir=out \
     --do_train=True \
     --do_eval=True \
@@ -76,7 +76,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
 
 
 
-CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
+CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
     --architecture=llama-temp-softmax \
     --hidden_size=384 \
     --num_attention_heads=6 \
@@ -92,7 +92,7 @@ CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
     --format_eval='reverse' \
     \
     \
-    --run_name='reverse' \
+    --run_name='reverse_ts' \
     --output_dir=out \
     --do_train=True \
     --do_eval=True \
@@ -124,7 +124,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
     \
     --n_digits_train='1,17' \
     --op_train='add' \
-    --format_train='reverse' \
+    --format_train='reverse_ts' \
     --n_digits_eval='4,33,4' \
     --op_eval='add' \
     --format_eval='reverse' \

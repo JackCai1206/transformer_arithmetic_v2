@@ -14,6 +14,7 @@ from lib.modeling.llama import LlamaModelWithNoPE
 class LlamaTempSoftAttnConfig(LlamaConfig):
     use_lpe: bool = False
     temp_beta: float = 3.0 # traininable temperature parameter (inside softmax -> T = beta log n)
+    fix_beta: bool = False
 
 
 class LlamaTempSoftAttn(LlamaAttention):
@@ -25,6 +26,8 @@ class LlamaTempSoftAttn(LlamaAttention):
         # Trainable temperature parameter beta
         self.temp_beta = config.temp_beta
         self.temp_beta = nn.Parameter(torch.tensor(self.temp_beta))
+        if config.fix_beta:
+            self.temp_beta.requires_grad = False
         
         self.attention_dropout = config.attention_dropout
         self.hidden_size = config.hidden_size

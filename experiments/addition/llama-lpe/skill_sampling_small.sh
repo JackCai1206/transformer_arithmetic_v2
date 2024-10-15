@@ -1,22 +1,13 @@
 set -e
-    # --learning_rate=5e-4 \
-    # --lr_scheduler_type='warmup_stable_decay' \
-    # --lr_scheduler_kwargs='{"num_stable_steps": 20000, "num_decay_steps": 2500}' \
-    # --adam_beta1=0.9 \
-    # --adam_beta2=0.98 \
-    # --adam_epsilon=1e-12 \
-    # --weight_decay=0.01 \
-    # --max_grad_norm=1 \
-    # --warmup_ratio=0.1 \
 
-for seed in 42 43 44 45 46; do
-    for rope_theta in 1e5; do
+for seed in 43 44 45 46; do
+    for rope_theta in Inf; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=lpe WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama \
+            --architecture=llama-lpe \
             --from_pretrained=False \
             --hidden_size=384 \
             --intermediate_size=1536 \
@@ -41,7 +32,7 @@ for seed in 42 43 44 45 46; do
             \
             --save_total_limit=1 \
             --resume_from_checkpoint=$resume \
-            --run_name='small' \
+            --run_name='lpe' \
             --output_dir=out \
             --do_train=$do_train \
             --do_eval=True \

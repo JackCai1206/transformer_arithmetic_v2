@@ -22,7 +22,7 @@ for seed in 42 43 44 45 46; do
             --n_digits_train='1,33 1,33 1,17' \
             --op_train='add add add' \
             --format_train='reverse-no-carry reverse-carry-only reverse' \
-            --op_dist_train='1,1,0 0,0,1' \
+            --op_dist_train='3,3,0 1,1,4' \
             --n_digits_eval='4,49,4' \
             --op_eval='add add add' \
             --format_eval='reverse-no-carry reverse-carry-only reverse' \
@@ -31,6 +31,8 @@ for seed in 42 43 44 45 46; do
             --mixture_scheduling_kwargs='{"schedule": "cosine", "wait_before": 0.1, "wait_after": 0}' \
             \
             \
+            --track_num_tokens_seen_by_task=True \
+            --early_stop=False \
             --save_total_limit=1 \
             --resume_from_checkpoint=$resume \
             --run_name='mixture' \
@@ -39,18 +41,17 @@ for seed in 42 43 44 45 46; do
             --do_eval=True \
             --max_steps=15000 \
             --learning_rate=1e-3 \
-            --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 7000, "num_decay_steps": 6500, "min_lr_ratio": 0.1}' \
+            --lr_scheduler_type='cosine' \
             --adam_beta2=0.98 \
             --adam_epsilon=1e-12 \
             --weight_decay=0.01 \
-            --warmup_ratio=0.1 \
+            --warmup_ratio=0.2 \
             --logging_steps=20 \
             --eval_strategy="steps" \
             --eval_steps=500 \
             --predict_with_generate \
             --remove_unused_columns=False \
-            --eval_on_start=False \
+            --eval_on_start=True \
             --per_device_train_batch_size=1024 \
             --per_device_eval_batch_size=1024 \
             --gradient_accumulation_steps=1 \

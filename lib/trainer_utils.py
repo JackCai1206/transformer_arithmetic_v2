@@ -18,7 +18,7 @@ from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from lib.data_utils import PromptAnswerDataCollator
 
-class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):  
+class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
     num_tokens_seen = defaultdict(int)
 
     def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
@@ -200,16 +200,25 @@ class AddWandbConfigCallback(WandbCallback):
         new_config = reduce(lambda x, y: {**x, **y}, self.extra_configs)
         self._wandb.config.update(new_config, allow_val_change=True)
 
+import re
+
 class EarlyStoppingCallback(TrainerCallback):
-    def __init__(self, metric_name, threshold, patience):
+    def __init__(self, metric_names, thresholds, patience):
         self.patience_counter = patience
-        self.metric_name = metric_name
-        self.threshold = threshold
+        self.metric_names = metric_names
+        self.thresholds = thresholds
         self.patience = patience
 
     def should_stop(self, state, metrics):
-        if self.metric_name in metrics and metrics[self.metric_name] >= self.threshold:
+        matched_keys_list = [
+            [ key for key in metrics.keys() if re.search(metric_name, key) ]
+        for metric_name in self.metric_names ]
+        if all(
+            all(metrics[key] >= threshold for key in matched_keys)
+            for matched_keys, threshold in zip(matched_keys_list, self.thresholds)
+        ):
             self.patience_counter -= 1
+        breakpoint()
 
         return self.patience_counter <= 0
 

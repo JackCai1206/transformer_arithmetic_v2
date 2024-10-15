@@ -9,6 +9,7 @@ from transformers import Seq2SeqTrainingArguments
 class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False
     track_num_tokens_seen_by_task: bool = False
+    early_stop: bool = False
 
 @dataclass
 class ScriptArguments:

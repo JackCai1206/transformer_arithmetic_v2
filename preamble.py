@@ -288,8 +288,8 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         AddConfigCB = AddWandbConfigCallback(extra_configs=[args.__dict__, data_args.__dict__, model_args.__dict__])
         trainer.add_callback(AddConfigCB)
 
-    if train_args.metric_for_best_model is not None:
-        EarlyStoppingCB = EarlyStoppingCallback(metric_name=train_args.metric_for_best_model, threshold=0.99, patience=1)
+    if train_args.early_stop:
+        EarlyStoppingCB = EarlyStoppingCallback(metric_names=['accuracy'], thresholds=[0.0], patience=1)
         trainer.add_callback(EarlyStoppingCB)
     
     if len(data_args.op_dist_train) > 1:

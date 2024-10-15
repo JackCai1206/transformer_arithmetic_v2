@@ -152,8 +152,8 @@ def data_generator(
                     raise ValueError(f'No sample hit {no_sample_hit} times')
                 continue
             prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train, backtrack_p=backtrack_p, backtrack_mask=backtrack_mask)
-        if show_task_ids: 
-            prompt = chr(ord('A') + task_id) + prompt
+        # if show_task_ids: 
+        #     prompt = chr(ord('A') + task_id) + prompt
 
         if loss_mask is None:
             loss_mask = [1] * len(target)

@@ -7,9 +7,16 @@ from transformers import Seq2SeqTrainingArguments
 
 @dataclass
 class MyTrainingArguments(Seq2SeqTrainingArguments):
-    do_backtrack_decoding: bool = False
+    do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
+    do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
+    early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
+    do_beam_search: Optional[bool] = False # Use beam search during generation
+    num_beams: Optional[int] = 1 # Number of beams for beam search
+    # num_return_sequences: Optional[int] = 5 # Number of sequences to return for each input
+    log_beta: Optional[bool] = False # Log beta values to wandb
     track_num_tokens_seen_by_task: bool = False
     early_stop: bool = False
+
 
 @dataclass
 class ScriptArguments:

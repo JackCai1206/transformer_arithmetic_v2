@@ -5,9 +5,9 @@ for seed in 42 43 44 45 46; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=mixture WANDB_MODE=disabled python run.py \
+        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=mixture WANDB_MODE=online python run.py \
             --seed=$seed \
-            --architecture=llama-lpe \
+            --architecture=llama \
             --from_pretrained=False \
             --hidden_size=384 \
             --intermediate_size=1536 \
@@ -28,6 +28,7 @@ for seed in 42 43 44 45 46; do
             --format_eval='reverse-no-carry reverse-carry-only reverse' \
             --op_dist_eval='1 1 1' \
             --show_task_ids=True \
+            --mixture_scheduling_kwargs='{"schedule": "cosine", "wait_before": 0.1, "wait_after": 0}' \
             \
             \
             --save_total_limit=1 \
@@ -36,10 +37,10 @@ for seed in 42 43 44 45 46; do
             --output_dir=out \
             --do_train=$do_train \
             --do_eval=True \
-            --max_steps=20000 \
+            --max_steps=15000 \
             --learning_rate=1e-3 \
             --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 10000, "num_decay_steps": 8000, "min_lr_ratio": 0.1}' \
+            --lr_scheduler_kwargs='{"num_stable_steps": 7000, "num_decay_steps": 6500, "min_lr_ratio": 0.1}' \
             --adam_beta2=0.98 \
             --adam_epsilon=1e-12 \
             --weight_decay=0.01 \
@@ -55,7 +56,7 @@ for seed in 42 43 44 45 46; do
             --gradient_accumulation_steps=1 \
             --include_inputs_for_metrics=True \
             --save_steps=500 \
-            --torch_compile=False \
+            --torch_compile=True \
             --bf16=True \
             --tf32=True
         done

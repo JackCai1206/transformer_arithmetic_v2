@@ -34,10 +34,10 @@ def get_COT(a, b):
             else:
                 c_prev = 0
                 ans_prev = ''
-            prompt = f'D{ans_prev}\nC{c_prev}P{a_str[i:]}+{b_str[i:]}='
-            cot += f'A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'
+            prompt = f'D{ans_prev}\n{c_prev}P{a_str[i:]}+{b_str[i:]}='
+            cot += f'{a_i}{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\n{c_i}'
         else:
-            cot += f'P{a_str[i:]}+{b_str[i:]}=A{a_i}B{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\nC{c_i}'
+            cot += f'P{a_str[i:]}+{b_str[i:]}={a_i}{b_i}S{(a_i + b_i) % 10}D{ans[:i+1]}\n{c_i}'
 
     # if train:
     #     print(prompt + cot)
@@ -46,7 +46,7 @@ def get_COT(a, b):
 
 def get_add1(a, b):
     if random() < 0.5:
-        return f'A{a[::-1]}+1{"0"*(len(b)-1)}=', str(int(a) + 1)[::-1], None
+        return f'{a[::-1]}+1{"0"*(len(b)-1)}=', str(int(a) + 1)[::-1], None
     else:
         return f'A1{"0"*(len(b)-1)}+{a[::-1]}=', str(int(a) + 1)[::-1], None
 
@@ -72,7 +72,7 @@ def get_reverse_add(a, b):
     s = str(int(a) + int(b))[::-1]
     l = max(len(a), len(b))
     s = s.ljust(l+1, '0')
-    return f'C{a[::-1]}+{b[::-1]}=', s, None
+    return f'{a[::-1]}+{b[::-1]}=', s, None
 
 def get_reverse_add_cont(a, b):
     s = list(str(int(a) + int(b)))[::-1]
@@ -101,11 +101,11 @@ def get_reverse_add_backtrack(a, b, p=0.2):
         loss_mask += [1]
 
     assert len(cot) == len(loss_mask), (len(s), len(cot), len(loss_mask))
-    return f'C{a[::-1]}+{b[::-1]}=', cot, loss_mask
+    return f'{a[::-1]}+{b[::-1]}=', cot, loss_mask
 
 def get_forward(a, b):
     s = str(int(a) + int(b))
-    return f'A{a}+{b}=', s, None
+    return f'{a}+{b}=', s, None
 
 def get_reverse_no_carry(a, b, randomize=False):
     def bin_op(a, b):
@@ -116,14 +116,14 @@ def get_reverse_no_carry(a, b, randomize=False):
     b = b[::-1]
     s = ''.join(bin_op(int(ai), int(bi)) for ai, bi in zip(a.ljust(l, '0'), b.ljust(l, '0')))
     s += '0'
-    
+
     if not randomize:
-        return f'A{a}+{b}=', s, None
+        return f'{a}+{b}=', s, None
     else:
         s = list(s)
         shuffle(s)
         s = ''.join(s)
-        return f'A{a}+{b}=', s, None
+        return f'{a}+{b}=', s, None
 
 def get_forward_no_carry(a, b, randomize=False):
     def bin_op(a, b):
@@ -136,12 +136,12 @@ def get_forward_no_carry(a, b, randomize=False):
     s += '0'
     
     if not randomize:
-        return f'A{a[::-1]}+{b[::-1]}=', s[::-1], None
+        return f'{a[::-1]}+{b[::-1]}=', s[::-1], None
     else:
         s = list(s)
         shuffle(s)
         s = ''.join(s)
-        return f'A{a[::-1]}+{b[::-1]}=', s[::-1], None
+        return f'{a[::-1]}+{b[::-1]}=', s[::-1], None
 
 def get_reverse_carry_only(a, b, randomize=False):
     def bin_op(a, b, prev_c):
@@ -166,12 +166,12 @@ def get_reverse_carry_only(a, b, randomize=False):
         s += si
         
     if not randomize:
-        return f'B{a}+{b}=', s, None
+        return f'{a}+{b}=', s, None
     else:
         s = list(s)
         shuffle(s)
         s = ''.join(s)
-        return f'B{a}+{b}=', s, None
+        return f'{a}+{b}=', s, None
 
 def get_forward_carry_only(a, b, randomize=False):
     def bin_op(a, b, prev_c):
@@ -196,12 +196,12 @@ def get_forward_carry_only(a, b, randomize=False):
         s += si
         
     if not randomize:
-        return f'B{a[::-1]}+{b[::-1]}=', s[::-1], None
+        return f'{a[::-1]}+{b[::-1]}=', s[::-1], None
     else:
         s = list(s)
         shuffle(s)
         s = ''.join(s)
-        return f'B{a[::-1]}+{b[::-1]}=', s[::-1], None
+        return f'{a[::-1]}+{b[::-1]}=', s[::-1], None
 
 def get_xor(a, b):
     l = max(len(a), len(b))
@@ -212,7 +212,7 @@ def get_xor(a, b):
     b = ''.join(map(lambda bi: chr(ord('a') + bi), b))
     s = ''.join(map(lambda si: chr(ord('a') + si), s))
     
-    return f'A{a}+{b}=', s, None
+    return f'{a}+{b}=', s, None
 
 def get_nar(a, n=5):
     i = randint(0, len(a) - n)
@@ -228,7 +228,7 @@ def get_sort(a, reverse=False):
         x.append(f'{str(ai).zfill(2)}')
     y = sorted(x, reverse=reverse)
 
-    return ','.join(x) + 'A[SEP]', ','.join(y), None
+    return ','.join(x) + '{SEP]', ','.join(y), None
 
 def get_set_diff(a):
     x = []
@@ -239,7 +239,7 @@ def get_set_diff(a):
     y = [x[k] for k in sorted(si[j+1:])]
     x_sort= [x[k] for k in si[:j+1]]
 
-    return ','.join(x) + 'B[SEP]' + ','.join(x_sort) + ',', ','.join(y), None
+    return ','.join(x) + '{SEP]' + ','.join(x_sort) + ',', ','.join(y), None
 
 def get_minimum(a):
     x = []
@@ -250,18 +250,18 @@ def get_minimum(a):
     y = x[si[0]]
     x = [x[k] for k in si]
 
-    return ','.join(x) + 'C[SEP]', str(y), None
+    return ','.join(x) + '{SEP]', str(y), None
 
 def get_rotate1(a):
     y = [str((int(ai) + 1) % 10) for ai in a]
-    return ''.join(a) + 'A[SEP]', ''.join(y), None
+    return ''.join(a) + '{SEP]', ''.join(y), None
 
 def get_reverse(a):
-    return a + 'B[SEP]', a[::-1], None
+    return a + '{SEP]', a[::-1], None
 
 def get_rot1rev(a):
     y = [str((int(ai) + 1) % 10) for ai in a]
-    return a + 'C[SEP]', ''.join(y[::-1]), None
+    return a + '{SEP]', ''.join(y[::-1]), None
 
 def get_interleave_copy(a, b):
     a_digits, b_digits, carries = split_digits(int(a), int(b))
@@ -269,26 +269,26 @@ def get_interleave_copy(a, b):
     a_digits = a_digits[::-1]
     b = ''.join(b_digits)
 
-    prompt = f'A{str(a)},{str(b)}[SEP]'
+    prompt = f'{str(a)},{str(b)}[SEP]'
     target = ''.join(f'{da}{db}' for da, db in zip(a_digits, b_digits))
 
     return prompt, target, None
 
 def get_reverse_2op(a, b):
     # b = ''.join([chr(ord('a') + int(i)) for i in b])
-    return f'B{a},{b}[SEP]', b[::-1]+','+a[::-1], None
+    return f'{a},{b}[SEP]', b[::-1]+','+a[::-1], None
 
 def get_itcopy_rev(a, b):
     prompt, target, _ = get_interleave_copy(a, b)
     return prompt.replace('A', 'C'), target[::-1], None
-    # return prompt.replace('A', 'C'), get_reverse_2op(a, b)[1] + 'A[SEP]' + target[::-1]
+    # return prompt.replace('A', 'C'), get_reverse_2op(a, b)[1] + '{SEP]' + target[::-1]
 
 def get_sd_mult(a, b):
     a_rev = a[::-1]
     b_rev = b[::-1]
     op1 = '0' + str(int(a) * int(b_rev[0]))[::-1]
     op2 = str(int(a) * int(b_rev[1]))[::-1]
-    return f'B{a_rev}*{b_rev}=', f'C{op1}+{op2}', None
+    return f'{a_rev}*{b_rev}=', f'{op1}+{op2}', None
 
 def get_mult(a, b):
     a_rev = a[::-1]
@@ -299,7 +299,7 @@ def get_mult(a, b):
     cot = '+'.join(cot)
     s = str(int(a) * int(b))[::-1]
     s = s.ljust(len(a)+1, '0')
-    return f'A{a_rev}*{b_rev}=', f'C{cot}={s}', None
+    return f'{a_rev}*{b_rev}=', f'{cot}={s}', None
 
 def get_cumsum(a):
     a_rev = a[::-1]
@@ -309,7 +309,7 @@ def get_cumsum(a):
         s += int(ai)
         s = s % 10
         cot += str(s)
-    return f'A{a_rev}=', cot, None
+    return f'{a_rev}=', cot, None
 
 def get_gt5(a):
     a_rev = a[::-1]
@@ -319,7 +319,7 @@ def get_gt5(a):
             cot += '1'
         else:
             cot += '0'
-    return f'B{a_rev}=', cot, None
+    return f'{a_rev}=', cot, None
 
 def get_cumsum_gt5(a):
     a_rev = a[::-1]
@@ -332,27 +332,27 @@ def get_cumsum_gt5(a):
             cot += '1'
         else:
             cot += '0'
-    return f'C{a_rev}=', cot, None
+    return f'{a_rev}=', cot, None
 
 def get_copy(a):
-    return f'D{a}=', a, None
+    return f'{a}=', a, None
 
 def get_3sum(a):
     s = ''
     for i in range(0, len(a), 2):
         s += str(a[i] or a[i+1])
     a_str = ''.join(map(str, a))
-    return f'A{a_str}=', s, None
+    return f'{a_str}=', s, None
 
 def get_parity(a):
     # s = sum(a)
     # a_str = ''.join(map(str, a))
-    # return f'B{a_str}=', str(s), None
+    # return f'{a_str}=', str(s), None
     s = ''
     for i in range(0, len(a), 2):
         s += str(a[i] and a[i+1])
     a_str = ''.join(map(str, a))
-    return f'B{a_str}=', s, None
+    return f'{a_str}=', s, None
 
 def get_3parity(a):
     # s = 0
@@ -360,14 +360,14 @@ def get_3parity(a):
     #     s = s + int(a[i] or a[i+1] or a[i+2])
     # # s = s % 2
     # a_str = ''.join(map(str, a))
-    # return f'C{a_str}=', str(s), None
+    # return f'{a_str}=', str(s), None
     or_str = get_3sum(a)[1]
     and_str = get_parity(a)[1]
     s = ''
     for ai, bi in zip(or_str, and_str):
         s += str((int(ai) + int(bi)) % 2)
     a_str = ''.join(map(str, a))
-    return f'C{a_str}=', s, None
+    return f'{a_str}=', s, None
 
 if __name__ == '__main__': 
     print(get_reverse_carry_only('122343', '994499'))

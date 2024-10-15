@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial, reduce
 from datasets import Dataset
@@ -17,11 +18,33 @@ from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from lib.data_utils import PromptAnswerDataCollator
 
-@dataclass
-class MyTrainingArguments(Seq2SeqTrainingArguments):
-    do_backtrack_decoding: bool = False
+class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):  
+    num_tokens_seen = defaultdict(int)
 
-class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):    
+    def training_step(self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]) -> torch.Tensor:
+        if self.args.track_num_tokens_seen_by_task:
+            task_ids = inputs.pop('task_id')
+            for tid in task_ids.unique():
+                main_input = inputs['input_ids'][task_ids == tid]
+                attn_mask = inputs['attention_mask'][task_ids == tid]
+                self.num_tokens_seen[tid.item()] += (
+                    torch.sum(
+                        self.accelerator.gather(
+                            torch.tensor(
+                                main_input.numel(), device=self.args.device, dtype=torch.int64
+                            ) - torch.sum(attn_mask)
+                        )
+                    )
+                    .cpu()
+                    .item()
+                )
+        return super().training_step(model, inputs)
+    
+    def log(self, logs: Dict[str, float]) -> None:
+        if self.args.track_num_tokens_seen_by_task:
+            logs |= {f'tokens_seen_{tid}': self.num_tokens_seen[tid] for tid in self.num_tokens_seen}
+        return super().log(logs)
+    
     def prediction_step(
         self,
         model: nn.Module,
@@ -199,20 +222,30 @@ class EarlyStoppingCallback(TrainerCallback):
     #         control.should_evaluate = True
 
 class DataMixtureSchedulingCallback(TrainerCallback):
-    def __init__(self, init, end):
+    def __init__(self, init, end, schedule='cosine', wait_before=0, wait_after=0.3):
         self.init = np.array(init)
         self.end = np.array(end)
+        self.schedule = schedule
+        self.wait_before = wait_before
+        self.wait_after = wait_after
     
     def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        step = state.global_step
-        total_steps = args.max_steps
-        mix = self.init + (self.end - self.init) * step / total_steps
-        mix = [r / sum(mix) for r in mix.tolist()]
+        wait_before = self.wait_before * args.max_steps
+        wait_after = self.wait_after * args.max_steps
+        total_steps = max(1, args.max_steps - wait_before - wait_after)
+        step = np.clip(state.global_step - wait_before, 0, total_steps)
+        if self.schedule == 'linear':
+            mix = self.init + (self.end - self.init) * step / total_steps
+        elif self.schedule == 'cosine':
+            mix = self.end + (self.init - self.end) * (1 + np.cos(np.pi * step / total_steps)) / 2
+
+        mix = mix / mix.sum()
+        mix[np.argmax(mix)] += 1 - mix.sum()
         kwargs['train_dataloader'].dataset._ex_iterable.probabilities[:] = mix
 
     def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
         mix = kwargs['train_dataloader'].dataset._ex_iterable.probabilities
-        logs['data_mixture'] = [round(p, 3) for p in mix]
+        logs |= {f'mix_{i}': round(p, 3) for i, p in enumerate(mix)}
 
 from transformers import Constraint, LogitsProcessor
 

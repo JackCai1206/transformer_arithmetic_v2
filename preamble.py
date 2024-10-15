@@ -289,7 +289,7 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         trainer.add_callback(AddConfigCB)
 
     if train_args.early_stop:
-        EarlyStoppingCB = EarlyStoppingCallback(metric_names=['accuracy'], thresholds=[0.0], patience=1)
+        EarlyStoppingCB = EarlyStoppingCallback(metric_names=[r'ID.*accuracy'], thresholds=[0.95], patience=1)
         trainer.add_callback(EarlyStoppingCB)
     
     if len(data_args.op_dist_train) > 1:

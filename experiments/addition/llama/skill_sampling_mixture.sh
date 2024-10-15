@@ -1,11 +1,14 @@
 set -e
 
+export NCCL_P2P_DISABLE="1"
+export NCCL_IB_DISABLE="1"
+
 for seed in 42 43 44 45 46; do
     for rope_theta in 1e5; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=mixture WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=mixture WANDB_MODE=online python run.py \
             --seed=$seed \
             --architecture=llama \
             --from_pretrained=False \
@@ -32,10 +35,10 @@ for seed in 42 43 44 45 46; do
             \
             \
             --track_num_tokens_seen_by_task=True \
-            --early_stop=False \
+            --early_stop=True \
             --save_total_limit=1 \
             --resume_from_checkpoint=$resume \
-            --run_name='mixture' \
+            --run_name='mixture-early-stop' \
             --output_dir=out \
             --do_train=$do_train \
             --do_eval=True \
@@ -59,7 +62,7 @@ for seed in 42 43 44 45 46; do
             --include_inputs_for_metrics=True \
             --save_steps=500 \
             --torch_compile=True \
-            --bf16=True \
+            --bf16=False \
             --tf32=True
         done
     done

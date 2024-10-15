@@ -204,12 +204,13 @@ import re
 
 class EarlyStoppingCallback(TrainerCallback):
     def __init__(self, metric_names, thresholds, patience):
-        self.patience_counter = patience
+        self.patience_counter = {}
         self.metric_names = metric_names
         self.thresholds = thresholds
         self.patience = patience
+        self.test_set_idx = 0
 
-    def should_stop(self, state, metrics):
+    def should_stop(self, state: TrainerState, metrics):
         matched_keys_list = [
             [ key for key in metrics.keys() if re.search(metric_name, key) ]
         for metric_name in self.metric_names ]
@@ -217,13 +218,21 @@ class EarlyStoppingCallback(TrainerCallback):
             all(metrics[key] >= threshold for key in matched_keys)
             for matched_keys, threshold in zip(matched_keys_list, self.thresholds)
         ):
-            self.patience_counter -= 1
-        breakpoint()
+            self.patience_counter[self.test_set_idx] -= 1
 
-        return self.patience_counter <= 0
+        return all(self.patience_counter[test_set_idx] <= 0 for test_set_idx in self.patience_counter)
 
     def on_evaluate(self, args, state: TrainerState, control: TrainerControl, model, metrics, **kwargs):
-        control.should_training_stop = self.should_stop(state, metrics)
+        if state.global_step > state.eval_steps: # Skip the first evaluation
+            control.should_training_stop = self.should_stop(state, metrics)
+        else:
+            self.patience_counter[self.test_set_idx] = self.patience
+        self.test_set_idx += 1
+
+    def on_step_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+        for test_set_idx in self.patience_counter:
+            self.patience_counter[test_set_idx] = self.patience
+        self.test_set_idx = 0
     
     # def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
     #     if state.total_flos >= 511_920_053_762_457_600:

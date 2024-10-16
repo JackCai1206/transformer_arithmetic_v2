@@ -375,7 +375,7 @@ done
 
 for seed in 43; do
     for rope_theta in Inf; do
-        for num_train in 5000,10000,50000,100000,500000,1000000,5000000,10000000; do
+        for num_train in 5000 10000 50000 100000 500000 1000000 5000000 10000000; do
             CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=backtrack WANDB_MODE=online python run.py \
                 --seed=$seed \
                 --architecture=llama \
@@ -388,7 +388,7 @@ for seed in 43; do
                 --rope_theta=$rope_theta \
                 \
                 \
-                --num_train=20000000 \
+                --num_train=$num_train \
                 --num_eval=1000 \
                 --n_digits_train='1,17' \
                 --op_train='add' \

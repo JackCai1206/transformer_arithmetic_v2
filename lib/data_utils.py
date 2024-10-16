@@ -169,7 +169,7 @@ def data_generator(
 def get_dataset_display_name(n_digits, op, format):
     return f'{n_digits}-{op}-{format}'
 
-def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer, no_sample_from: dict[str, Dataset]=None):
+def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer, no_sample_from: Dict[str, Dataset]=None):
     def add_special_tokens(batch, add_eos=True):
         batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
         if add_eos:

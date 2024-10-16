@@ -32,7 +32,7 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
                         self.accelerator.gather(
                             torch.tensor(
                                 main_input.numel(), device=self.args.device, dtype=torch.int64
-                            ) - torch.sum(attn_mask)
+                            ) - torch.sum(~attn_mask)
                         )
                     )
                     .cpu()
@@ -240,26 +240,28 @@ class EarlyStoppingCallback(TrainerCallback):
     #         control.should_evaluate = True
 
 class DataMixtureSchedulingCallback(TrainerCallback):
-    def __init__(self, init, end, schedule='cosine', wait_before=0, wait_after=0.3):
+    def __init__(self, init, end, schedule='cosine', wait_before=0, wait_after=0.3, update_every=10):
         self.init = np.array(init)
         self.end = np.array(end)
         self.schedule = schedule
         self.wait_before = wait_before
         self.wait_after = wait_after
+        self.update_every = update_every
     
     def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        wait_before = self.wait_before * args.max_steps
-        wait_after = self.wait_after * args.max_steps
-        total_steps = max(1, args.max_steps - wait_before - wait_after)
-        step = np.clip(state.global_step - wait_before, 0, total_steps)
-        if self.schedule == 'linear':
-            mix = self.init + (self.end - self.init) * step / total_steps
-        elif self.schedule == 'cosine':
-            mix = self.end + (self.init - self.end) * (1 + np.cos(np.pi * step / total_steps)) / 2
+        if state.global_step % self.update_every == 0:
+            wait_before = self.wait_before * args.max_steps
+            wait_after = self.wait_after * args.max_steps
+            total_steps = max(1, args.max_steps - wait_before - wait_after)
+            step = np.clip(state.global_step - wait_before, 0, total_steps)
+            if self.schedule == 'linear':
+                mix = self.init + (self.end - self.init) * step / total_steps
+            elif self.schedule == 'cosine':
+                mix = self.end + (self.init - self.end) * (1 + np.cos(np.pi * step / total_steps)) / 2
 
-        mix = mix / mix.sum()
-        mix[np.argmax(mix)] += 1 - mix.sum()
-        kwargs['train_dataloader'].dataset._ex_iterable.probabilities[:] = mix
+            mix = mix / mix.sum()
+            mix[np.argmax(mix)] += 1 - mix.sum()
+            kwargs['train_dataloader'].dataset._ex_iterable.probabilities[:] = mix
 
     def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
         mix = kwargs['train_dataloader'].dataset._ex_iterable.probabilities

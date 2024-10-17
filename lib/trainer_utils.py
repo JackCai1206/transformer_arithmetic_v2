@@ -405,7 +405,19 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
 
             input_ids = input_ids[:, -1]
             
-            ended = self.label_count >= self.labels.shape[1] # boolean mask for sequences that have exhausted their labels
+            # Case 3: Correct token generated
+            # ipdb.set_trace()
+            correct_mask = (labels == input_ids)
+            if correct_mask.any():
+                # Correct token generated, increment label count
+                self.label_count[correct_mask] += 1
+                # Clear the list of incorrect tokens for those sequences since correct token was hit
+                for i in torch.where(correct_mask)[0]:
+                    self.incorrect_tokens[i] = []  # Reset incorrect tokens after hitting the correct label
+                # surpress the backtrack token
+                scores[correct_mask] = scores[correct_mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[correct_mask]), -9e9)
+
+            ended = self.label_count >= self.labels.shape[1] -1  # boolean mask for sequences that have exhausted their labels
             labels[ended] = input_ids[ended]  # Don't force labels if we've exhausted them
             mask = (labels != input_ids) & (input_ids != self.backtrack_tok) # (batch_size) boolean mask for incorrect tokens that aren't backtrack tokens
 
@@ -426,19 +438,6 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
                 for incorrect_tok in self.incorrect_tokens[i]:
                     # Make the logits for previously incorrect tokens very low (suppress them)
                     scores[i] = scores[i].scatter(0, torch.tensor([incorrect_tok], device=device), -9e9)
-
-            # Case 3: Correct token generated
-            # ipdb.set_trace()
-            correct_mask = (labels == input_ids)
-            if correct_mask.any():
-                # Correct token generated, increment label count
-                self.label_count[correct_mask] += 1
-                # Clear the list of incorrect tokens for those sequences since correct token was hit
-                for i in torch.where(correct_mask)[0]:
-                    self.incorrect_tokens[i] = []  # Reset incorrect tokens after hitting the correct label
-                # surpress the backtrack token
-                scores[correct_mask] = scores[correct_mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[correct_mask]), -9e9)
-
 
         self.count += 1
         return scores

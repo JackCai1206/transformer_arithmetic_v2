@@ -151,7 +151,7 @@ def data_generator(
                 continue
             prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
         if show_task_ids: 
-            prompt = chr(ord('A') + task_id) + prompt
+            prompt = chr(ord('A') + task_id) * 4 + prompt + chr(ord('A') + task_id) * 4
 
         if loss_mask is None:
             loss_mask = [1] * len(target)

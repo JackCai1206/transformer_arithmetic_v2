@@ -25,14 +25,12 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         if self.args.track_num_tokens_seen_by_task:
             task_ids = inputs.pop('task_id')
             for tid in task_ids.unique():
-                main_input = inputs['input_ids'][task_ids == tid]
+                # main_input = inputs['input_ids'][task_ids == tid]
                 attn_mask = inputs['attention_mask'][task_ids == tid]
                 self.num_tokens_seen[tid.item()] += (
                     torch.sum(
                         self.accelerator.gather(
-                            torch.tensor(
-                                main_input.numel(), device=self.args.device, dtype=torch.int64
-                            ) - torch.sum(~attn_mask)
+                            torch.sum(attn_mask)
                         )
                     )
                     .cpu()

@@ -78,6 +78,11 @@ for i in range(data_args.n_digits_eval[0], data_args.n_digits_eval[1]):
     result_dict[f'{i}_digit_acc'] = result[f"eval_{i}-add-reverse_accuracy"]
     result_dict[f'{i}_digit_dist'] = result[f"eval_{i}-add-reverse_distance"]
 
+    if args.eval_more:
+        result_dict[f'{i}_digit_avg_first_wrong_loc'] = result[f"eval_{i}-add-reverse_avg_first_wrong_loc"]
+        result_dict[f'{i}_digit_avg_backtrack_count'] = result[f"eval_{i}-add-reverse_avg_backtrack_count"]
+        result_dict[f'{i}_digit_avg_first_backtrack_loc'] = result[f"eval_{i}-add-reverse_avg_first_backtrack_loc"]
+
 df = pd.DataFrame(result_dict, index=[0])
 
 if args.eval_more:

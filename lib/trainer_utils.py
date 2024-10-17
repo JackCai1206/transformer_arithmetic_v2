@@ -357,18 +357,24 @@ class BacktrackLogitsProcessor(LogitsProcessor):
         if self.count > 0:
             labels = self.labels[torch.arange(self.labels.shape[0]), self.label_count.clip(max=self.labels.shape[1]-1)]
             input_ids = input_ids[:, -1]
-
+            
             self.label_count += (labels == input_ids).to(self.label_count.device) # when the model generates the correct token, increment the label count
+            
+            ended = self.label_count.to(input_ids.device) >= self.labels.shape[1] -1
 
-            ended = self.label_count >= self.labels.shape[1] -1 
             labels[ended] = input_ids[ended] # If there are no more labels to match, don't force anything
             mask = (labels != input_ids) & (input_ids != self.backtrack_tok)
+            
             if mask.any():
                 # when the model generates wrong tokens that aren't backtrack tokens, force a backtrack token
                 scores[mask] = scores[mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[mask]), 9e9)
                 # If the model hasn't generated all the labels, prevent [EOS] from being generated
                 scores[~ended] = scores[~ended].scatter(1, self.eos_tok.to(input_ids.device).expand_as(scores[~ended]), -9e9)
 
+            # if end is reached, force [EOS] to be generated
+            scores[ended] = scores[ended].scatter(1, self.eos_tok.to(input_ids.device).expand_as(scores[ended]), 9e9)
+
+            # self.label_count += (labels == input_ids).to(self.label_count.device) # when the model generates the correct token, increment the label count
 
         self.count += 1
 
@@ -402,7 +408,6 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
         if self.count > 0:            
             # Get current expected label for each sequence
             labels = self.labels[torch.arange(self.labels.shape[0], device=device), self.label_count.clip(max=self.labels.shape[1]-1)]
-
             input_ids = input_ids[:, -1]
             
             # Case 3: Correct token generated
@@ -418,6 +423,7 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
                 scores[correct_mask] = scores[correct_mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[correct_mask]), -9e9)
 
             ended = self.label_count >= self.labels.shape[1] -1  # boolean mask for sequences that have exhausted their labels
+            
             labels[ended] = input_ids[ended]  # Don't force labels if we've exhausted them
             mask = (labels != input_ids) & (input_ids != self.backtrack_tok) # (batch_size) boolean mask for incorrect tokens that aren't backtrack tokens
 

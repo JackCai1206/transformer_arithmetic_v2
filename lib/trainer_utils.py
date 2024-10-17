@@ -124,7 +124,7 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
             gen_kwargs['early_stopping'] = self.args.early_stopping
         
         if self.args.do_backtrack_decoding or self.args.do_backtrack_eval or self.args.do_backtrack_decoding2:
-            gen_kwargs['max_new_tokens'] = gen_kwargs['max_new_tokens'] * 3
+            gen_kwargs['max_new_tokens'] = gen_kwargs['max_new_tokens'] * self.args.backtrack_decoding_multiplier
             gen_kwargs['eos_token_id']=self.tokenizer.eos_token_id
         
         if self.args.do_backtrack_decoding:

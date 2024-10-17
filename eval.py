@@ -8,16 +8,19 @@ from transformers import HfArgumentParser, set_seed, Seq2SeqTrainingArguments
 from typing import cast, Optional, Tuple, Union
 from dataclasses import dataclass
 
+
 @dataclass
 class ScriptArguments:
     foo: str = 'bar'
     result_name: str = 'result'
-
+    eval_more: Optional[bool] = True # use compute_metrics_new instead of compute_metrics if True
 
 @dataclass
 class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
     do_backtrack_decoding2: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
+    backtrack_decoding_multiplier: Optional[int] = 3 # Multiplier for the number of max_new_tokens
+
     do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
     do_beam_search: Optional[bool] = False # Use beam search during generation
@@ -76,6 +79,10 @@ for i in range(data_args.n_digits_eval[0], data_args.n_digits_eval[1]):
     result_dict[f'{i}_digit_dist'] = result[f"eval_{i}-add-reverse_distance"]
 
 df = pd.DataFrame(result_dict, index=[0])
+
+if args.eval_more:
+    args.result_name += '_new'
+
 df.to_csv(f'{dir_name}/{args.result_name}.csv')
 
 print(f"Results saved to {dir_name}/{args.result_name}.csv")

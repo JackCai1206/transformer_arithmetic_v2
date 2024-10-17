@@ -6,7 +6,7 @@ from functools import partial
 import torch
 from lib.configs import ScriptArguments, ModelArguments, DataArguments, MyTrainingArguments
 from lib.data_utils import get_train_dataset, get_eval_dataset, PromptAnswerDataCollator
-from lib.eval_utils import compute_metrics
+from lib.eval_utils import compute_metrics, compute_metrics_new
 from lib.modeling.add_rule_embedding import LlamaConfigWithAddRules, LlamaModelWithAddRules
 from lib.modeling.llama import LlamaForCausalLMWithNoPE, MyLlamaConfig
 from lib.modeling.llama_diff_attn import LlamaDiffAttnConfig, LlamaForCausalLMDiffAttn
@@ -298,7 +298,7 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         args=train_args,
         train_dataset=train_dataset if train_args.do_train else None,
         eval_dataset=eval_datasets if train_args.do_eval else None,
-        compute_metrics=partial(compute_metrics, tokenizer, args=train_args),
+        compute_metrics=partial(compute_metrics, tokenizer, args=train_args) if not args.eval_more else partial(compute_metrics_new, tokenizer, args=train_args),
         data_collator=PromptAnswerDataCollator(
             pad_token_id=tokenizer.pad_token_id,
             label_pad_token_id=-100,

@@ -10,6 +10,8 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
     do_backtrack_decoding2: bool = False
     do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
+    backtrack_decoding_multiplier: Optional[int] = 3 # Multiplier for the number of max_new_tokens
+
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
     do_beam_search: Optional[bool] = False # Use beam search during generation
     num_beams: Optional[int] = 1 # Number of beams for beam search
@@ -26,7 +28,9 @@ class ScriptArguments:
     ref_model: bool = False
     ref_model_path: Optional[str] = None
     dpo_beta: Optional[float] = 0.5
-
+    eval_more: Optional[bool] = False # use compute_metrics_new instead of compute_metrics if True
+    
+    
 @dataclass
 class ModelArguments:
     model_id: Optional[str] = None

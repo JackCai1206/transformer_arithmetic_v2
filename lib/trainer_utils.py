@@ -129,7 +129,7 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         
         if self.args.do_backtrack_decoding:
             backtrack_tok = self.tokenizer.backtrack_token_id
-            logits_processor = BacktrackLogitsProcessor(generation_inputs['labels'], backtrack_tok, eos_tok=self.tokenizer.eos_token_id)
+            logits_processor = BacktrackLogitsProcessor(generation_inputs['labels'], backtrack_tok, eos_tok=self.tokenizer.eos_token_id, tokenizer=self.tokenizer)
             generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs, logits_processor=[logits_processor])
         elif self.args.do_backtrack_decoding2:
             backtrack_tok = self.tokenizer.backtrack_token_id
@@ -338,12 +338,13 @@ class TemplateLogitsProcessor(LogitsProcessor):
         return scores
 
 class BacktrackLogitsProcessor(LogitsProcessor):
-    def __init__(self, labels, backtrack_tok, eos_tok):
+    def __init__(self, labels, backtrack_tok, eos_tok, tokenizer=None):
         self.labels = labels
         self.backtrack_tok = torch.tensor(backtrack_tok)
         self.eos_tok = torch.tensor(eos_tok)
         self.count = 0
         self.label_count = torch.zeros(labels.shape[0], dtype=torch.long)
+        self.tokenizer = tokenizer
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
         # if input_ids.shape[0] != self.labels.shape[0] (in the case of beam search), we repeat the labels
@@ -351,10 +352,15 @@ class BacktrackLogitsProcessor(LogitsProcessor):
             self.labels = self.labels.repeat_interleave(input_ids.shape[0] // self.labels.shape[0], dim=0)
             self.label_count = self.label_count.repeat_interleave(input_ids.shape[0] // self.label_count.shape[0], dim=0)
 
+        # print(self.tokenizer.decode(input_ids[0]))
+        # import ipdb; ipdb.set_trace()
         if self.count > 0:
             labels = self.labels[torch.arange(self.labels.shape[0]), self.label_count.clip(max=self.labels.shape[1]-1)]
             input_ids = input_ids[:, -1]
-            ended = self.label_count >= self.labels.shape[1]
+
+            self.label_count += (labels == input_ids).to(self.label_count.device) # when the model generates the correct token, increment the label count
+
+            ended = self.label_count >= self.labels.shape[1] -1 
             labels[ended] = input_ids[ended] # If there are no more labels to match, don't force anything
             mask = (labels != input_ids) & (input_ids != self.backtrack_tok)
             if mask.any():
@@ -363,7 +369,6 @@ class BacktrackLogitsProcessor(LogitsProcessor):
                 # If the model hasn't generated all the labels, prevent [EOS] from being generated
                 scores[~ended] = scores[~ended].scatter(1, self.eos_tok.to(input_ids.device).expand_as(scores[~ended]), -9e9)
 
-            self.label_count += (labels == input_ids).to(self.label_count.device) # when the model generates the correct token, increment the label count
 
         self.count += 1
 

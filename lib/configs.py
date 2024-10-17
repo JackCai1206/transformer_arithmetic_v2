@@ -8,6 +8,7 @@ from transformers import Seq2SeqTrainingArguments
 @dataclass
 class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
+    do_backtrack_decoding2: bool = False
     do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
     do_beam_search: Optional[bool] = False # Use beam search during generation

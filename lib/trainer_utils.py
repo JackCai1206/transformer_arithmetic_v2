@@ -417,11 +417,10 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
                         self.incorrect_tokens[i].append(input_ids[i].item())  # Record the incorrect token
 
             # Case 2: Suppress previously incorrect tokens when backtrack token is generated
-            for i in range(input_ids.shape[0]):
-                if input_ids[i] == self.backtrack_tok:
-                    for incorrect_tok in self.incorrect_tokens[i]:
-                        # Make the logits for previously incorrect tokens very low (suppress them)
-                        scores[i] = scores[i].scatter(0, torch.tensor([incorrect_tok], device=device), -9e9)
+            for i in torch.where(input_ids == self.backtrack_tok)[0]:
+                for incorrect_tok in self.incorrect_tokens[i]:
+                    # Make the logits for previously incorrect tokens very low (suppress them)
+                    scores[i] = scores[i].scatter(0, torch.tensor([incorrect_tok], device=device), -9e9)
 
             # Case 3: Correct token generated
             # ipdb.set_trace()
@@ -430,9 +429,8 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
                 # Correct token generated, increment label count
                 self.label_count[correct_mask] += 1
                 # Clear the list of incorrect tokens for those sequences since correct token was hit
-                for i in range(input_ids.shape[0]):
-                    if correct_mask[i]:
-                        self.incorrect_tokens[i] = []  # Reset incorrect tokens after hitting the correct label
+                for i in torch.where(correct_mask)[0]:
+                    self.incorrect_tokens[i] = []  # Reset incorrect tokens after hitting the correct label
                 # surpress the backtrack token
                 scores[correct_mask] = scores[correct_mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[correct_mask]), -9e9)
 

@@ -12,6 +12,8 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
     backtrack_decoding_multiplier: Optional[int] = 3 # Multiplier for the number of max_new_tokens
 
+    do_dpo: bool = False
+
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
     do_beam_search: Optional[bool] = False # Use beam search during generation
     num_beams: Optional[int] = 1 # Number of beams for beam search
@@ -24,10 +26,9 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
 @dataclass
 class ScriptArguments:
     foo: str = 'bar'
-    do_dpo: bool = False
     ref_model: bool = False
     ref_model_path: Optional[str] = None
-    dpo_beta: Optional[float] = 0.5
+    dpo_beta: Optional[float] = 0.1
     eval_more: Optional[bool] = False # use compute_metrics_new instead of compute_metrics if True
     
     
@@ -81,6 +82,7 @@ class DataArguments:
     backtrack_p: Optional[float] = 0.2
     backtrack_mask: Optional[bool] = False
     mixture_scheduling_kwargs: Optional[Union[dict, str]] = field(default_factory=dict)
+    dpo_format: Optional[str] = None # 'repeat_penalty' or 'backtrack_reward'
 
     def __post_init__(self):
     #     if self.format.startswith("{"):

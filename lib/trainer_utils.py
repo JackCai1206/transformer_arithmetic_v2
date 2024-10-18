@@ -17,6 +17,7 @@ import numpy as np
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.integrations.deepspeed import is_deepspeed_zero3_enabled
 from lib.data_utils import PromptAnswerDataCollator
+from lib.configs import MyTrainingArguments
 
 import wandb
 
@@ -184,8 +185,8 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         return loss, generated_tokens, labels
 
 @dataclass
-class DPOSeq2SeqConfig(DPOConfig, Seq2SeqTrainingArguments):
-    pass
+class DPOSeq2SeqConfig(DPOConfig, MyTrainingArguments):
+    track_num_tokens_seen_by_task: bool = False
 
 class DPOTrainerDefaultEval(DPOTrainer, Seq2SeqTrainerNoEvalLoss):
     def __init__(self, *args, train_dataset=None, eval_dataset=None, **kwargs):
@@ -203,6 +204,7 @@ class DPOTrainerDefaultEval(DPOTrainer, Seq2SeqTrainerNoEvalLoss):
         self.evaluation_loop = partial(DPOTrainer.evaluation_loop, self)
         self.prediction_step = partial(DPOTrainer.prediction_step, self)
         return results
+
 
 class AddWandbConfigCallback(WandbCallback):
     def __init__(self, extra_configs=[], **kwargs):

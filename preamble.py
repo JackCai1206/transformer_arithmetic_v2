@@ -281,7 +281,7 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     
     train_args.run_name += f'-seed-{train_args.seed}'
     
-    if not train_args.do_train:
+    if not train_args.do_train and not train_args.do_dpo:
         train_args.run_name += '-eval'
 
     train_args.output_dir = f"out/{train_args.run_name}"

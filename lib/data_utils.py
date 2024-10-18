@@ -386,7 +386,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
 
     return ds_list, unmapped_ds_list
 
-def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
+def get_dpo_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
     def rand_trunc(l):
         # return l[:random.randint(0, len(l)-1)]
         return ''.join([str(random.randint(0, 9)) for _ in range(random.randint(0, len(l)-1))])
@@ -394,27 +394,42 @@ def get_dpo_dataset(args: DataArguments, tokenizer: PreTrainedTokenizer):
     def get_dpo_format(batch):
         batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
         batch['chosen'] = [i + tokenizer.eos_token for i in batch['target']]
-        if 'COT' in args.format_train:
+        if 'COT' in args.format_train: # CoT
             from .data_formats import get_truncated_cot
             batch['rejected'] = [get_truncated_cot(i) + tokenizer.eos_token for i in batch['prompt']]
-        else:
+        elif 'backtrack' in args.format_train and args.dpo_format == 'repeat_penalty': # train on surpressing retrying on same error tokens
+            from .data_formats import get_dpo_repeated_backtrack
+            return get_dpo_repeated_backtrack(batch)
+        elif 'backtrack' in args.format_train and args.dpo_format == 'backtrack_reward': # train on surpressing retrying on same error tokens + adding backtrack tokens after correct answer
+            from .data_formats import get_dpo_backtrack
+            return get_dpo_backtrack(batch)
+        else: # reverse
             batch['rejected'] = [rand_trunc(i) + tokenizer.eos_token for i in batch['target']]
         # batch['rejected'] = [tokenizer.eos_token for i in batch['target']]
+
         return batch
-    
+        
     ds = IterableDataset.from_generator(
         data_generator,
         gen_kwargs={
             'train': True,
+            'task_id': 0, # TODO:
             'op': args.op_train[0],
             'format': args.format_train[0],
             'n_digits_a_range': args.n_digits_train[0],
             'shard': [range(i * round((args.num_train[0] * 1) // args.nproc), (i + 1) * round((args.num_train[0] * 1) // args.nproc)) for i in range(args.nproc)],
             'show_task_ids': args.show_task_ids,
-            # 'seed': 0 TODO: fix
+            'seed': train_args.seed,
         },
     ) \
     .map(get_dpo_format, batched=True, batch_size=1000, remove_columns=['target'])
+
+
+    print('----------- Examples from DPO data: -------------')
+    for example in itertools.islice(ds, 0, 10):
+        print('prompt  ', example['prompt'])
+        print('chosen  ', example['chosen'])
+        print('rejected', example['rejected'])
 
     return ds
 

@@ -445,6 +445,65 @@ def get_truncated_cot(l):
     return cot
 
 
+def get_dpo_backtrack(batch):
+    # batch['prompt'], batch['target'], batch['rejected']
+    import ipdb; ipdb.set_trace()
+
+    return batch
+
+
+def get_dpo_repeated_backtrack(batch):
+    # batch['prompt'], batch['target'], batch['rejected']
+
+    '''
+    batch.keys(): dict_keys(['prompt', 'target', 'loss_mask', 'n_digits', 'task_id', 'chosen'])
+    batch['prompt'][0]: '[BOS]C73+9680979716=' 
+    batch['target'][0]: '5X7X63X7X02X90972X4X97160'
+    batch['chosen'][0]: '5X7X63X7X02X90972X4X97160[EOS]'
+    batch['loss_mask][0]: [1, 1, ..., 1, 1] # length = len(target)
+    '''
+
+    def generate_random_string():
+        # List of available numbers (as strings)
+        numbers = [str(i) for i in range(10)]  # ['0', '1', '2', ..., '9']
+        
+        # Randomly shuffle the numbers
+        shuffle(numbers)
+        
+        # Random length for the string (between 1 and the length of the available numbers)
+        length = randint(1, 9)
+        
+        # Build the string with alternating numbers and 'X'
+        result = ''.join([num + 'X' for num in numbers[:length]])
+        
+        return result, numbers[length], choice(numbers[:length])
+    
+    prompt_list = []
+    target_list = []
+    rejected_list = []
+    loss_mask_list = []
+    
+    for _ in range(len(batch['prompt'])):
+        # Generate a random string
+        prompt, target, reject = generate_random_string()
+        prompt_list.append(prompt)
+        target_list.append(target)
+        rejected_list.append(reject)
+        loss_mask_list.append([1])
+
+    batch['prompt'] = prompt_list
+    batch['target'] = target_list
+    batch['chosen'] = target_list
+    batch['rejected'] = rejected_list
+    batch['loss_mask'] = loss_mask_list
+
+
+    return batch
+
+
+
+
+
 if __name__ == '__main__': 
     print(get_reverse_carry_only('122343', '994499'))
     print(get_reverse_no_carry('122343', '994499'))

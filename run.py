@@ -11,7 +11,8 @@ model = get_model(train_args, model_args, tokenizer)
 
 train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 
-trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
+if not train_args.do_dpo:
+    trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
 
 # check local rank
 if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
@@ -33,11 +34,12 @@ if train_args.do_train:
         #     trainer.train()
         # pr.dump_stats(f"{train_args.output_dir}/profile")
         trainer.train()
-elif train_args.do_eval and not args.do_dpo:
+
+elif train_args.do_eval and not train_args.do_dpo:
     trainer._load_from_checkpoint(resume_from_checkpoint=train_args.resume_from_checkpoint)
     trainer.evaluate()
 
-if args.do_dpo:
+if train_args.do_dpo:
     import torch
     import copy
     
@@ -81,7 +83,7 @@ if args.do_dpo:
     #     'tokenizer': tokenizer,
     #     'generation_config': train_args.generation_config
     # })
-    dpo_dataset = get_dpo_dataset(data_args, tokenizer)
+    dpo_dataset = get_dpo_dataset(train_args, data_args, tokenizer)
 
     # 2. Train DPO model, eval with seq2seq trainer
     ref_model = None
@@ -119,7 +121,7 @@ if args.do_dpo:
         args=dpo_config,
         tokenizer=tokenizer,
         callbacks=[],
-        compute_metrics=partial(compute_metrics, tokenizer)
+        compute_metrics=partial(compute_metrics, tokenizer, args=train_args)
     )
 
     dpo_trainer.train(

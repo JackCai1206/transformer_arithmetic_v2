@@ -13,15 +13,17 @@ from dataclasses import dataclass
 class ScriptArguments:
     foo: str = 'bar'
     result_name: str = 'result'
-    eval_more: Optional[bool] = True # use compute_metrics_new instead of compute_metrics if True
+    eval_more: Optional[bool] = False # use compute_metrics_new instead of compute_metrics if True
 
 @dataclass
 class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_decoding: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
     do_backtrack_decoding2: bool = False # Automatically adds backtrack tokens during generation if the model generates the wrong token
+    do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
     backtrack_decoding_multiplier: Optional[int] = 3 # Multiplier for the number of max_new_tokens
 
-    do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
+    do_dpo: bool = False
+
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
     do_beam_search: Optional[bool] = False # Use beam search during generation
     num_beams: Optional[int] = 1 # Number of beams for beam search
@@ -59,7 +61,13 @@ model = get_model(train_args, model_args, tokenizer)
 train_args.do_train = True # making it false will automatically create -eval directory which is not desirable
 train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 
+if train_args.do_backtrack_decoding2 and train_args.backtrack_decoding_multiplier == 10:
+    args.eval_more = True
+
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
+
+if train_args.do_dpo:
+    train_args.save_safetensors = True
 
 trainer._load_from_checkpoint(resume_from_checkpoint=train_args.resume_from_checkpoint)
 
@@ -74,7 +82,7 @@ dir_name = '/'.join(train_args.resume_from_checkpoint.split('/')[:-1])
 
 result_dict = {}
 
-for i in range(data_args.n_digits_eval[0], data_args.n_digits_eval[1]):
+for i in range(data_args.n_digits_eval[0], data_args.n_digits_eval[1], data_args.n_digits_eval[2]):
     result_dict[f'{i}_digit_acc'] = result[f"eval_{i}-add-reverse_accuracy"]
     result_dict[f'{i}_digit_dist'] = result[f"eval_{i}-add-reverse_distance"]
 

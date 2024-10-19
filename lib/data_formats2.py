@@ -68,10 +68,11 @@ def get_state_tracking(a, b, op='carry', generate_at=10, propagate_at=9):
 
 # Auxiliary 3: Other Operations
 def get_add1(a, b):
+    one = str(10**len(b))
     if random() < 0.5:
-        return f'{a[::-1]}+{10**len(b)}=', str(int(a) + 10**len(b))[::-1], None
+        return f'{a[::-1]}+{one[::-1]}=', str(int(a) + int(one))[::-1], None
     else:
-        return f'{10**len(b)}+{a[::-1]}=', str(int(a) + 10**len(b))[::-1], None
+        return f'{one[::-1]}+{a[::-1]}=', str(int(a) + int(one))[::-1], None
 
 def get_reverse_sub(a, b):
     s = str(int(a) - int(b))[::-1]

@@ -8,7 +8,8 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 
 from .configs import DataArguments, MyTrainingArguments
-from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_backtrack, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort, get_xor
+from .data_formats import get_3parity, get_3sum, get_copy, get_cumsum, get_cumsum_gt5, get_forward, get_forward_carry_only, get_forward_no_carry, get_gt5, get_itcopy_rev, get_minimum, get_mult, get_nar, get_parity, get_reverse, get_COT, get_interleave_copy, get_reverse_2op, get_reverse_add, get_reverse_add_automata, get_reverse_add_backtrack, get_reverse_add_cont, get_reverse_carry_only, get_reverse_no_carry, get_rot1rev, get_rotate1, get_sd_mult, get_set_diff, get_sort, get_xor
+from .data_formats2 import get_add1, get_pairwise_digit_op, get_reverse_sub, get_state_tracking
 
 import random
 import numpy as np
@@ -16,6 +17,8 @@ from datasets import IterableDataset, Dataset, interleave_datasets, disable_cach
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
+
+disable_caching()
 
 def get_line(a, b, op=None, format=None, train=None):
     if op == 'add':
@@ -49,6 +52,8 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_add1(a, b)
         elif format == 'backtrack':
             return get_reverse_add_backtrack(a, b)
+        elif format == 'reverse-sub':
+            return get_reverse_sub(a, b)
     elif op == 'sort':
         if format == 'sort':
             return get_sort(a)
@@ -95,6 +100,12 @@ def get_line(a, b, op=None, format=None, train=None):
             return get_3parity(a)
         elif format == 'xor': 
             return get_xor(a, b)
+    elif op == 'pairwise':
+        bin_op, bias = format.split(':')
+        return get_pairwise_digit_op(a, b, op=bin_op, bias=int(bias))
+    elif op == 'state_tracking': 
+        bin_op, generate_at, propagate_at = format.split(':')
+        return get_state_tracking(a, b, op=bin_op, generate_at=int(generate_at), propagate_at=int(propagate_at))
 
     raise ValueError(f'Unknown op or format: {op}, {format}')
 
@@ -103,11 +114,12 @@ def data_generator(
     format: str,
     task_id: int,
     show_task_ids: bool, 
+    disjoint_tokens: bool,
     n_digits_a_range: Tuple[int] = None,
     n_digits_b_range: Tuple[int] | None = None,
     train: bool = True,
     shard: List[range] = None,
-    no_sample_set: set = None,
+    no_sample_set: set = None, # this is not used
     seed: int = None
 ):
     if n_digits_b_range is None:
@@ -153,6 +165,14 @@ def data_generator(
             prompt, target, loss_mask = get_line(a, b, op=op, format=format, train=train)
         if show_task_ids: 
             prompt = chr(ord('A') + task_id) * 4 + prompt + chr(ord('A') + task_id) * 4
+        
+        if disjoint_tokens:
+            if task_id == 1:
+                prompt = prompt.translate(str.maketrans('0123456789', 'abcdefghij'))
+                target = target.translate(str.maketrans('0123456789', 'abcdefghij'))
+            elif task_id == 2:
+                prompt = prompt.translate(str.maketrans('0123456789', 'klmnopqrst'))
+                target = target.translate(str.maketrans('0123456789', 'klmnopqrst'))
 
         if loss_mask is None:
             loss_mask = [1] * len(target)
@@ -274,6 +294,7 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
                 'n_digits_a_range': args.n_digits_train[opi],
                 'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
                 'show_task_ids': args.show_task_ids,
+                'disjoint_tokens': args.disjoint_tokens,
                 'seed': train_args.seed,
             },
             **kwargs
@@ -362,6 +383,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
                         'n_digits_a_range': (n_digits, n_digits + 1),
                         'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
                         'show_task_ids': args.show_task_ids,
+                        'disjoint_tokens': args.disjoint_tokens,
                         'seed': train_args.seed,
                     },
                     num_proc=args.nproc,

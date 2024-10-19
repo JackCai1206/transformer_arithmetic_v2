@@ -72,7 +72,8 @@ class CharacterTokenizer(PreTrainedTokenizer):
 
     def get_vocab(self):
         filtered_vocab = {k: v for k, v in self._vocab_str_to_int.items() if v >= 0}
-        return filtered_vocab | self._added_tokens_encoder
+        # return filtered_vocab | self._added_tokens_encoder
+        return filtered_vocab
 
     def _tokenize(self, text: str) -> List[str]:
         return list(text)

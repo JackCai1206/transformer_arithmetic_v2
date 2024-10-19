@@ -118,6 +118,7 @@ def data_generator(
     if not train:
         seed = 1000 + seed
     random.seed(seed + shard[0].start)
+    print(f'Generating data for {op} {format} {task_id} {n_digits_a_range} {n_digits_b_range} {train} {shard[0]}')
     for _ in shard[0]:
         if op == 'sort':
             # Generate a random list of digits
@@ -427,7 +428,7 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         if train_pad_side == 'left':
             self.left_pad_list += ['input_ids', 'attention_mask', 'labels']
         elif train_pad_side == 'random':
-            self.rand_pad_list = ['input_ids', 'attention_mask', 'labels']
+            self.rand_pad_list += ['input_ids', 'attention_mask', 'labels']
 
         self.train_pad_to = train_pad_to
         self.eval_pad_to = eval_pad_to
@@ -444,7 +445,6 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
             self.rand_pad_amt = None
 
     def __call__(self, features):
-        # convert to dict of lists and pop the labels
         features = {
             key: [example[key] for example in features] for key in features[0].keys()
         }
@@ -495,6 +495,12 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
             else:
                 padded_batch[input_k] = pad_sequence(to_pad, batch_first=True, padding_value=padding_value)
+            
+            # max_len = max([len(ex) for ex in to_pad])
+            # max_len = (max_len // 16 + 1) * 16
+            # pad_amt = [max_len - len(ex) for ex in to_pad]
+            # left_pad = self.rand_pad_amt if k in self.rand_pad_list else [0] * len(to_pad)
+            # padded_batch[input_k] = torch.stack([torch.nn.functional.pad(ex, (lp, pad - lp), value=padding_value) for ex, lp, pad in zip(to_pad, left_pad, pad_amt)], dim=0)
 
             pad_to = self.train_pad_to if is_train else self.eval_pad_to
             if pad_to is not None:
@@ -520,4 +526,6 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         # print(padded_batch['attention_mask'][0:2])
         # print(padded_batch['labels'][0:2])
         # breakpoint()
+        
+        assert (padded_batch['input_ids'][padded_batch['attention_mask'] == 1] >= 0).all(), "input_ids has negative values"
         return padded_batch

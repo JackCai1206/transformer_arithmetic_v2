@@ -22,6 +22,8 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     track_num_tokens_seen_by_task: bool = False
     early_stop: bool = False
 
+    output_dir: Optional[str] = 'out'
+
 
 @dataclass
 class ScriptArguments:
@@ -30,6 +32,7 @@ class ScriptArguments:
     ref_model_path: Optional[str] = None
     dpo_beta: Optional[float] = 0.1
     eval_more: Optional[bool] = False # use compute_metrics_new instead of compute_metrics if True
+    wandb_project: Optional[str] = 'backtrack'
     
     
 @dataclass
@@ -61,6 +64,7 @@ class DataArguments:
     num_train: Optional[Union[Tuple[Tuple[int]], str]] = '20_000_000'
     num_eval: int = 100
     eval_samples_file: str = 'data'
+    train_file: Optional[str] = 'data/train'
     num_dpo_data: int = 10000
     n_digits_train: Optional[Union[Tuple[Tuple[int]], str]] = '1,20'
     n_digits_eval: Optional[Union[Tuple[int], str]] = '15,30,5'

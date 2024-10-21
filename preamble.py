@@ -284,7 +284,7 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     if not train_args.do_train and not train_args.do_dpo:
         train_args.run_name += '-eval'
 
-    train_args.output_dir = f"out/{train_args.run_name}"
+    train_args.output_dir = f"{train_args.output_dir}/{train_args.run_name}"
     
     if model_args.architecture == 'llama-temp-softmax':
         train_args.log_beta = True

@@ -17,7 +17,7 @@ if not train_args.do_dpo:
 # check local rank
 if "LOCAL_RANK" not in os.environ or os.environ["LOCAL_RANK"] == "0":
     import wandb
-    wandb.init(project='backtrack', entity="ssdd", name=train_args.run_name)
+    wandb.init(project=args.wandb_project, entity="ssdd", name=train_args.run_name)
 
     # Workaround for incrorrect global metrics
     # define our custom x axis metric

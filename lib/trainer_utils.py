@@ -391,7 +391,7 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
         self.count = 0
         self.label_count = torch.zeros(labels.shape[0], dtype=torch.long) # (batch_size)
         # Keep track of incorrect tokens generated for each sequence
-        self.incorrect_tokens = [[] for _ in range(labels.shape[0])]
+        self.incorrect_tokens = [[backtrack_tok] for _ in range(labels.shape[0])] # [[] for _ in range(labels.shape[0])]
         self.tokenizer = tokenizer # for debugging purposes (used to decode tokens)
 
     def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
@@ -408,26 +408,39 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
 
         # import ipdb; ipdb.set_trace()
         if self.count > 0:            
+            # import ipdb; ipdb.set_trace()
+            # print('self.labels[2]', self.tokenizer.batch_decode([self.labels[2]]))
+            # print('input_ids[2]', self.tokenizer.batch_decode([input_ids[2]]))
+            # print('input_ids[2]', input_ids[2])
             # Get current expected label for each sequence
             labels = self.labels[torch.arange(self.labels.shape[0], device=device), self.label_count.clip(max=self.labels.shape[1]-1)]
             input_ids = input_ids[:, -1]
             
             # Case 3: Correct token generated
-            # ipdb.set_trace()
+            # print('labels[2]', labels[2].item())
+            # print('input_ids[2]', input_ids[2].item())
             correct_mask = (labels == input_ids)
             if correct_mask.any():
                 # Correct token generated, increment label count
                 self.label_count[correct_mask] += 1
                 # Clear the list of incorrect tokens for those sequences since correct token was hit
                 for i in torch.where(correct_mask)[0]:
-                    self.incorrect_tokens[i] = []  # Reset incorrect tokens after hitting the correct label
+                    self.incorrect_tokens[i] = [self.backtrack_tok] # [] # Reset incorrect tokens after hitting the correct label 
                 # surpress the backtrack token
                 scores[correct_mask] = scores[correct_mask].scatter(1, self.backtrack_tok.to(input_ids.device).expand_as(scores[correct_mask]), -9e9)
 
             ended = self.label_count >= self.labels.shape[1] -1  # boolean mask for sequences that have exhausted their labels
+            if ended.any():
+                # If all tokens are correctly predicted, allow EOS token
+                scores[ended] = scores[ended].scatter(1, self.eos_tok.to(input_ids.device).expand_as(scores[ended]), 9e9)
+            # print('self.label_count[2]', self.label_count[2].item())
+            # print('correct_mask[2]', correct_mask[2].item())
+            # print('ended[2]', ended[2].item())
             
             labels[ended] = input_ids[ended]  # Don't force labels if we've exhausted them
             mask = (labels != input_ids) & (input_ids != self.backtrack_tok) # (batch_size) boolean mask for incorrect tokens that aren't backtrack tokens
+            # print('mask[2]', mask[2].item())
+            # print('labels[2]', labels[2].item())
 
             # Case 1: Generated token is incorrect and not backtrack token
             if mask.any():

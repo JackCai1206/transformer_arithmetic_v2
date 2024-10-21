@@ -88,11 +88,13 @@ def compute_metrics_new(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction
     # Decode and print the predictions
     prompt_str = tokenizer.batch_decode(pred_obj.inputs[:5])
     pred_str = tokenizer.batch_decode(pred_obj.predictions[:5, pred_obj.inputs.shape[1]:])
+    cleaned_pred_str = tokenizer.batch_decode(pred[:5])
     label_str = tokenizer.batch_decode(pred_obj.label_ids[:5])
-    for pr, p, l in zip(prompt_str, pred_str, label_str):
+    for pr, p, cp, l in zip(prompt_str, pred_str, cleaned_pred_str, label_str):
         print("="*80)
         print(f"Prompt: {repr(pr)}")
         print(f"Pred  : {repr(p)}")
+        print(f"Cleaned Pred  : {repr(cp)}")
         print(f"Label : {repr(l)}")
     
     # Calculate average metrics

@@ -61,7 +61,7 @@ model = get_model(train_args, model_args, tokenizer)
 train_args.do_train = True # making it false will automatically create -eval directory which is not desirable
 train_args = prepare_train_args(train_args, model_args, data_args, tokenizer)
 
-if train_args.do_backtrack_decoding2 and train_args.backtrack_decoding_multiplier == 10:
+if train_args.do_backtrack_decoding2 and train_args.backtrack_decoding_multiplier >= 10:
     args.eval_more = True
 
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
@@ -72,6 +72,8 @@ if train_args.do_dpo:
 trainer._load_from_checkpoint(resume_from_checkpoint=train_args.resume_from_checkpoint)
 
 result = trainer.evaluate()
+
+print(result)
 
 # save results
 import pandas as pd

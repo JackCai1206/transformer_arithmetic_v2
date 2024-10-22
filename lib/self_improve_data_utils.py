@@ -136,20 +136,24 @@ def get_train_dataset_from_model(answer_model, train_dataset, train_args: MyTrai
         kwargs = {'num_proc': args.nproc}
         kwargs2 = {'keep_in_memory': True, 'cache_dir': train_file, 'split': 'train'}
 
-        ds0 = ds_class.from_generator(
-            data_generator_from_model,
-            gen_kwargs={
-                'answer_model': answer_model,
-                'dataset': train_dataset,
-                'tokenizer': tokenizer,
-                'train': True, 
-                'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
-                'seed': train_args.seed,
-                # 'n_digits': n_digits,
-                'device': train_args.device
-            },
-            **(kwargs | kwargs2)
-        )
+        if os.path.exists(train_file):
+            print(f'Loading {train_file}')
+            ds0 = load_dataset(train_file, split='train')
+        else:
+            ds0 = ds_class.from_generator(
+                data_generator_from_model,
+                gen_kwargs={
+                    'answer_model': answer_model,
+                    'dataset': train_dataset,
+                    'tokenizer': tokenizer,
+                    'train': True, 
+                    'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
+                    'seed': train_args.seed,
+                    # 'n_digits': n_digits,
+                    'device': train_args.device
+                },
+                **(kwargs | kwargs2)
+            )
         
         ds0_list.append(ds0)
         ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
@@ -231,24 +235,29 @@ def get_eval_datasets_from_model(answer_model, eval_datasets, train_args: Seq2Se
                 eval_file += '-43'
                 
             # shards: [range(0, 12), range(12, 24), ...]
+            
+            if os.path.exists(eval_file):
+                print(f'Loading {eval_file}')
+                ds0 = load_dataset(eval_file, split='test')
+            else:
+                ds0 = Dataset.from_generator(
+                    data_generator_from_model,
+                    gen_kwargs={
+                        'answer_model': answer_model,
+                        'dataset': eval_datasets[key],
+                        'tokenizer': tokenizer,
+                        'train': False, 
+                        'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
+                        'seed': train_args.seed,
+                        'n_digits': n_digits,
+                        'device': train_args.device
+                    },
+                    num_proc=args.nproc,
+                    keep_in_memory=True,
+                    cache_dir=eval_file,
+                    split='test'
+                )
 
-            ds0 = Dataset.from_generator(
-                data_generator_from_model,
-                gen_kwargs={
-                    'answer_model': answer_model,
-                    'dataset': eval_datasets[key],
-                    'tokenizer': tokenizer,
-                    'train': False, 
-                    'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
-                    'seed': train_args.seed,
-                    'n_digits': n_digits,
-                    'device': train_args.device
-                },
-                num_proc=args.nproc,
-                keep_in_memory=True,
-                cache_dir=eval_file,
-                split='test'
-            )
             # for f in ds0.cache_files:
             #     shutil.rmtree(os.path.dirname(f['filename']))
             # ds0.save_to_disk(eval_file) 

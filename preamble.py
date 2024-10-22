@@ -262,6 +262,14 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     train_args.dataloader_prefetch_factor = 16
     train_args.remove_unused_columns = False
     
+    
+    train_args.run_name += f'-seed-{train_args.seed}'
+    
+    if not train_args.do_train and not train_args.do_dpo:
+        train_args.run_name += '-eval'
+
+    train_args.output_dir = f"{train_args.output_dir}/{train_args.run_name}"
+
     if train_args.resume_from_checkpoint == 'True':
         # Try finding a checkpoint in the output directory
         try:
@@ -278,13 +286,6 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
                 train_args.resume_from_checkpoint = ckpt_dir
         except:
             pass
-    
-    train_args.run_name += f'-seed-{train_args.seed}'
-    
-    if not train_args.do_train and not train_args.do_dpo:
-        train_args.run_name += '-eval'
-
-    train_args.output_dir = f"{train_args.output_dir}/{train_args.run_name}"
     
     if model_args.architecture == 'llama-temp-softmax':
         train_args.log_beta = True
@@ -325,3 +326,17 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         trainer.add_callback(CustomParameterLoggingCB)
 
     return trainer
+
+
+def get_all_datasets_from_model(answer_model, train_dataset, eval_datasets, train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+    from lib.self_improve_data_utils import get_train_dataset_from_model, get_eval_datasets_from_model
+    if train_args.do_eval:
+        eval_datasets, unmapped_eval_datasets = get_eval_datasets_from_model(answer_model, eval_datasets, train_args, data_args, tokenizer)
+    else:
+        eval_datasets = None
+    if train_args.do_train:
+        train_dataset = get_train_dataset_from_model(answer_model, train_dataset, train_args, data_args, tokenizer)
+    else:
+        train_dataset = None
+    tokenizer.padding_side = 'left' # in case it was changed by the data generator
+    return train_dataset, eval_datasets

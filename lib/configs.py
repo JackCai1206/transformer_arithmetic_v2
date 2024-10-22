@@ -87,7 +87,9 @@ class DataArguments:
     backtrack_mask: Optional[bool] = False
     mixture_scheduling_kwargs: Optional[Union[dict, str]] = field(default_factory=dict)
     dpo_format: Optional[str] = None # 'repeat_penalty' or 'backtrack_reward'
-
+    load_as_iterable_dataset: bool = True
+    no_seed_for_data: bool = False
+    
     def __post_init__(self):
     #     if self.format.startswith("{"):
     #         self.format = json.loads(self.format)

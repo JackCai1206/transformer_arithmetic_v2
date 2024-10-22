@@ -257,7 +257,14 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
             kwargs = {}
         else:
             ds_class = Dataset
+            os.makedirs(args.train_file, exist_ok=True)
+            train_file = os.path.join(args.train_file, f'{args.op_train[opi]}-{args.format_train[opi]}-{args.n_digits_train[opi][0]}_{args.n_digits_train[opi][1]}-{args.num_train[opi]}')
+            if not args.no_seed_for_data:
+                train_file += f'-{train_args.seed}'
+            else:
+                train_file += '-43'
             kwargs = {'num_proc': args.nproc}
+            kwargs2 = {'keep_in_memory': False, 'cache_dir': train_file, 'split': 'train'}
         ds = ds_class.from_generator(
             data_generator,
             gen_kwargs={
@@ -272,15 +279,21 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
                 'backtrack_p': args.backtrack_p,
                 'backtrack_mask': args.backtrack_mask,
             },
-            **kwargs
+            **(kwargs | kwargs2)
         )
+        
+        # save as csv (the original version! without special tokens and tokenization)
+        if not args.use_iterable_dataset and not args.load_as_iterable_dataset:
+            ds.to_csv(train_file+'.csv')
+            print(f'Saved {train_file}.csv')
+
         ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]}, **kwargs)
         ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
         remove_columns = ['prompt', 'target', 'loss_mask', 'n_digits']
         if not train_args.track_num_tokens_seen_by_task:
             remove_columns.append('task_id')
         ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=remove_columns, **kwargs)
-        if not args.use_iterable_dataset:
+        if not args.use_iterable_dataset and args.load_as_iterable_dataset:
             ds = ds.to_iterable_dataset(num_shards=args.nproc)
         ds_list.append(ds)
 
@@ -343,7 +356,11 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
     for n_digits in range(*args.n_digits_eval):
         for opi, frac in enumerate(args.op_dist_eval):
             os.makedirs(args.eval_samples_file, exist_ok=True)
-            eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}-{train_args.seed}')
+            eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}')
+            if not args.no_seed_for_data:
+                eval_file += f'-{train_args.seed}'
+            else:
+                eval_file += '-43'
             # if os.path.exists(eval_file):
             if False:
                 ds0 = Dataset.load_from_disk(eval_file)
@@ -375,6 +392,10 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
             ds_list[key] = ds
             unmapped_ds_list[key] = ds0
             # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
+
+            # save as csv (the original version! without special tokens and tokenization)
+            ds0.to_csv(eval_file+'.csv')
+            print(f'Saved {eval_file}.csv')
 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():

@@ -1,3 +1,5 @@
+# Generate self-improve data from the model (answer_model), where the target (label) is the output of the model
+
 import os
 from preamble import get_args, get_tokenizer, get_all_datasets, get_model, prepare_train_args, get_trainer, get_all_datasets_from_model
 import torch
@@ -38,6 +40,7 @@ data_args.eval_file_from_model = f'data/eval_from_model-{model_id}'
 data_args.train_file_from_model = f'data/train_from_model-{model_id}'
 data_args.nproc = 1
 
+# Get self-improve data (which is automatically saved in data/eval_from_model-, data/train_from_model-)
 train_dataset_from_model, eval_datasets_from_model = get_all_datasets_from_model(answer_model, train_dataset, eval_datasets, train_args, data_args, tokenizer)
 
 exit()

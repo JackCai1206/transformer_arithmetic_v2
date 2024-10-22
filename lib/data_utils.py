@@ -12,7 +12,7 @@ from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum,
 
 import random
 import numpy as np
-from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching
+from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, concatenate_datasets
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
@@ -247,6 +247,7 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
         return example['prompt'] not in no_sample_from[key]['prompt']
 
     ds_list = []
+    ds0_list = []
     if len(args.op_dist_train) > 1:
         fracs = [max(x,y) for x,y in zip(*args.op_dist_train)]
     else:
@@ -265,7 +266,7 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
                 train_file += '-43'
             kwargs = {'num_proc': args.nproc}
             kwargs2 = {'keep_in_memory': False, 'cache_dir': train_file, 'split': 'train'}
-        ds = ds_class.from_generator(
+        ds0 = ds_class.from_generator(
             data_generator,
             gen_kwargs={
                 'train': True,
@@ -282,12 +283,8 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
             **(kwargs | kwargs2)
         )
         
-        # save as csv (the original version! without special tokens and tokenization)
-        if not args.use_iterable_dataset and not args.load_as_iterable_dataset:
-            ds.to_csv(train_file+'.csv')
-            print(f'Saved {train_file}.csv')
-
-        ds = ds.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]}, **kwargs)
+        ds0_list.append(ds0)
+        ds = ds0.filter(filter_eval, fn_kwargs={'op': args.op_train[opi], 'format': args.format_train[opi]}, **kwargs)
         ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
         remove_columns = ['prompt', 'target', 'loss_mask', 'n_digits']
         if not train_args.track_num_tokens_seen_by_task:
@@ -296,6 +293,12 @@ def get_train_dataset(train_args: MyTrainingArguments, args: DataArguments, toke
         if not args.use_iterable_dataset and args.load_as_iterable_dataset:
             ds = ds.to_iterable_dataset(num_shards=args.nproc)
         ds_list.append(ds)
+    
+    # save as csv (the original version! without special tokens and tokenization)
+    if not args.use_iterable_dataset and not args.load_as_iterable_dataset:
+        ds_to_save = concatenate_datasets(ds0_list)
+        ds_to_save.to_csv(train_file+'.csv')
+        print(f'Saved {train_file}.csv')
 
     init_probs = [frac / sum(args.op_dist_train[0]) for frac in args.op_dist_train[0]]
     if len(args.op_dist_train) > 1:
@@ -354,6 +357,7 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
     ds_list = {}
     unmapped_ds_list = {}
     for n_digits in range(*args.n_digits_eval):
+        ds0_list = []
         for opi, frac in enumerate(args.op_dist_eval):
             os.makedirs(args.eval_samples_file, exist_ok=True)
             eval_file = os.path.join(args.eval_samples_file, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}')
@@ -392,10 +396,13 @@ def get_eval_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, 
             ds_list[key] = ds
             unmapped_ds_list[key] = ds0
             # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
-
-            # save as csv (the original version! without special tokens and tokenization)
-            ds0.to_csv(eval_file+'.csv')
-            print(f'Saved {eval_file}.csv')
+            ds0_list.append(ds0)
+        
+        
+        # save as csv (the original version! without special tokens and tokenization)
+        ds_to_save = concatenate_datasets(ds0_list)
+        ds_to_save.to_csv(eval_file+'.csv')
+        print(f'Saved {eval_file}.csv')
 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():

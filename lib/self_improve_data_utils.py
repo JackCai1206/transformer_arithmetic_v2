@@ -11,7 +11,7 @@ from .configs import DataArguments, MyTrainingArguments
 
 import random
 import numpy as np
-from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, load_dataset
+from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, load_dataset, concatenate_datasets
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
@@ -118,6 +118,7 @@ def get_train_dataset_from_model(answer_model, train_dataset, train_args: MyTrai
         return batch_new
 
     ds_list = []
+    ds0_list = [] # original version without special tokens and tokenization
     if len(args.op_dist_train) > 1:
         fracs = [max(x,y) for x,y in zip(*args.op_dist_train)]
     else:
@@ -133,16 +134,16 @@ def get_train_dataset_from_model(answer_model, train_dataset, train_args: MyTrai
             train_file += '-43'
         
         kwargs = {'num_proc': args.nproc}
-        kwargs2 = {'keep_in_memory': False, 'cache_dir': train_file, 'split': 'train'}
+        kwargs2 = {'keep_in_memory': True, 'cache_dir': train_file, 'split': 'train'}
 
-        ds = ds_class.from_generator(
+        ds0 = ds_class.from_generator(
             data_generator_from_model,
             gen_kwargs={
                 'answer_model': answer_model,
                 'dataset': train_dataset,
                 'tokenizer': tokenizer,
                 'train': True, 
-                'shard': [range(i * round((args.num_eval * frac) // args.nproc), (i + 1) * round((args.num_eval * frac) // args.nproc)) for i in range(args.nproc)],
+                'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
                 'seed': train_args.seed,
                 # 'n_digits': n_digits,
                 'device': train_args.device
@@ -150,16 +151,18 @@ def get_train_dataset_from_model(answer_model, train_dataset, train_args: MyTrai
             **(kwargs | kwargs2)
         )
         
-        # save as csv (the original version! without special tokens and tokenization)
-        ds.to_csv(train_file+'.csv')
-        print(f'Saved {train_file}.csv')
-        
-        ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
+        ds0_list.append(ds0)
+        ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
         remove_columns = ['prompt', 'target', 'loss_mask']
         ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=remove_columns, **kwargs)
         if not args.use_iterable_dataset and args.load_as_iterable_dataset:
             ds = ds.to_iterable_dataset(num_shards=args.nproc)
         ds_list.append(ds)
+
+    # save as csv (the original version! without special tokens and tokenization)
+    ds_to_save = concatenate_datasets(ds0_list)
+    ds_to_save.to_csv(train_file+'.csv')
+    print(f'Saved {train_file}.csv')
 
     init_probs = [frac / sum(args.op_dist_train[0]) for frac in args.op_dist_train[0]]
     if len(args.op_dist_train) > 1:
@@ -188,11 +191,6 @@ def get_train_dataset_from_model(answer_model, train_dataset, train_args: MyTrai
         print(tokenizer.decode(example['labels']))
         # breakpoint()
     #     l.append(len(example['input_ids']))
-
-    # import matplotlib.pyplot as plt
-    # plt.hist(l, bins=100)
-    # plt.savefig('train_hist.png')
-    # breakpoint()
     
     if not args.use_train_attention_mask:
         ds = ds.remove_columns('attention_mask')
@@ -222,6 +220,7 @@ def get_eval_datasets_from_model(answer_model, eval_datasets, train_args: Seq2Se
 
     for key in eval_datasets.keys():
         n_digits = int(key.split('-')[0])
+        ds0_list = []
         for opi, frac in enumerate(args.op_dist_eval):
             os.makedirs(args.eval_file_from_model, exist_ok=True)
             eval_file = os.path.join(args.eval_file_from_model, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}')
@@ -260,10 +259,12 @@ def get_eval_datasets_from_model(answer_model, eval_datasets, train_args: Seq2Se
             ds_list[key] = ds
             unmapped_ds_list[key] = ds0
             # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
-
-            # save as csv (the original version! without special tokens and tokenization)
-            ds0.to_csv(eval_file+'.csv')
-            print(f'Saved {eval_file}.csv')
+            ds0_list.append(ds0)
+            
+        ds_to_save = concatenate_datasets(ds0_list)
+        # save as csv (the original version! without special tokens and tokenization)
+        ds_to_save.to_csv(eval_file+'.csv')
+        print(f'Saved {eval_file}.csv')
 
     print('----------- Examples from eval: -------------')
     for ds in ds_list.values():

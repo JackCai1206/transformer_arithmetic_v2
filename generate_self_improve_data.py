@@ -38,7 +38,8 @@ answer_model.eval()
 model_id = '/'.join(train_args.resume_from_checkpoint.split('/')[-2:]).replace('/', '_')
 data_args.eval_file_from_model = f'data/eval_from_model-{model_id}'
 data_args.train_file_from_model = f'data/train_from_model-{model_id}'
-data_args.nproc = 1
+
+data_args.nproc = 1 # TODO: somehow nproc > 1 will create error
 
 # Get self-improve data (which is automatically saved in data/eval_from_model-, data/train_from_model-)
 train_dataset_from_model, eval_datasets_from_model = get_all_datasets_from_model(answer_model, train_dataset, eval_datasets, train_args, data_args, tokenizer)

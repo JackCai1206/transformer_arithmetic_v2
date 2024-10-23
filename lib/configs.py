@@ -89,6 +89,9 @@ class DataArguments:
     dpo_format: Optional[str] = None # 'repeat_penalty' or 'backtrack_reward'
     load_as_iterable_dataset: bool = True
     no_seed_for_data: bool = False
+    data_from_saved_train_base: Optional[str] = None # original data that was used to train initial model, directory after 'data/train'
+    data_from_saved_train_new: Optional[Union[Tuple[str], str]] = None # directory after 'data/train_from_model-.../'
+    
     
     def __post_init__(self):
     #     if self.format.startswith("{"):
@@ -108,3 +111,4 @@ class DataArguments:
         self.n_digits_dpo = tuple(map(int, self.n_digits_dpo.split(',')))
         # assert len(self.op_eval) == len(self.op_dist_eval) == len(self.format_eval) == len(self.n_digits_eval), 'You must provide the same number of values for op_eval, op_dist_eval, format_eval, and n_digits_eval'
         self.mixture_scheduling_kwargs = json.loads(self.mixture_scheduling_kwargs) if isinstance(self.mixture_scheduling_kwargs, str) else self.mixture_scheduling_kwargs
+        self.data_from_saved_train_new = tuple(self.data_from_saved_train_new.split(',')) if self.data_from_saved_train_new is not None else None

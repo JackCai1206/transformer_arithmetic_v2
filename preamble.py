@@ -329,14 +329,55 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
 
 
 def get_all_datasets_from_model(answer_model, train_dataset, eval_datasets, train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+    # Create or Loaod data generated from the answer_model
     from lib.self_improve_data_utils import get_train_dataset_from_model, get_eval_datasets_from_model
+
     if train_args.do_eval:
         eval_datasets, unmapped_eval_datasets = get_eval_datasets_from_model(answer_model, eval_datasets, train_args, data_args, tokenizer)
     else:
         eval_datasets = None
+
     if train_args.do_train:
         train_dataset = get_train_dataset_from_model(answer_model, train_dataset, train_args, data_args, tokenizer)
     else:
         train_dataset = None
     tokenizer.padding_side = 'left' # in case it was changed by the data generator
     return train_dataset, eval_datasets
+
+
+
+def get_all_datasets_from_saved(train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+    # Load data that is saved
+    from lib.self_improve_data_utils import get_train_dataset_from_saved, get_eval_dataset_from_saved
+
+    if train_args.do_eval:
+        eval_datasets, unmapped_eval_datasets = get_eval_dataset_from_saved(train_args, data_args, tokenizer)
+    else:
+        eval_datasets = None
+    
+    if train_args.do_train:
+        train_dataset = get_train_dataset_from_saved(train_args, data_args, tokenizer)
+    else:
+        train_dataset = None
+    tokenizer.padding_side = 'left' # in case it was changed by the data generator
+
+    return train_dataset, eval_datasets
+
+
+''' # TODO:
+def get_all_datasets_from_model2(answer_model, train_dataset, eval_datasets, train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+    # Create or Loaod data generated from the answer_model
+    from lib.self_improve_data_utils import get_train_dataset_from_model2, get_eval_datasets_from_model2
+
+    if train_args.do_eval:
+        eval_datasets, unmapped_eval_datasets = get_eval_datasets_from_model2(answer_model, eval_datasets, train_args, data_args, tokenizer)
+    else:
+        eval_datasets = None
+
+    if train_args.do_train:
+        train_dataset = get_train_dataset_from_model2(answer_model, train_dataset, train_args, data_args, tokenizer)
+    else:
+        train_dataset = None
+    tokenizer.padding_side = 'left' # in case it was changed by the data generator
+    return train_dataset, eval_datasets
+'''

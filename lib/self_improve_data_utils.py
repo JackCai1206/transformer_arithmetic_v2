@@ -11,7 +11,7 @@ from .configs import DataArguments, MyTrainingArguments
 
 import random
 import numpy as np
-from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, load_dataset, concatenate_datasets
+from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, load_dataset, concatenate_datasets, load_from_disk
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
@@ -187,7 +187,7 @@ def get_train_dataset_from_model(answer_model, train_dataset, train_args: MyTrai
     # ds = ds.with_format('torch').map(add_attn_masks, batched=True, batch_size=1000, num_proc=16)
 
     # l = []
-    print('----------- Examples from train: -------------')
+    print('----------- Examples from train (generated from model): -------------')
     for example in itertools.islice(ds, 0, 100):
         # print(example['input_ids'])
         print(tokenizer.decode(example['input_ids']))
@@ -260,7 +260,7 @@ def get_eval_datasets_from_model(answer_model, eval_datasets, train_args: Seq2Se
 
             # for f in ds0.cache_files:
             #     shutil.rmtree(os.path.dirname(f['filename']))
-            # ds0.save_to_disk(eval_file) 
+            # ds0.save_to_disk(eval_file)
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
             ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'loss_mask'])
 
@@ -275,12 +275,383 @@ def get_eval_datasets_from_model(answer_model, eval_datasets, train_args: Seq2Se
         ds_to_save.to_csv(eval_file+'.csv')
         print(f'Saved {eval_file}.csv')
 
-    print('----------- Examples from eval: -------------')
+    print('----------- Examples from eval (generated from model): -------------')
     for ds in ds_list.values():
         for example in ds.take(1):
-            print(example['eval_input_ids'])
+            # print(example['eval_input_ids'])
             print(tokenizer.decode(example['eval_input_ids']))
-            print(example['eval_labels'])
+            # print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
     
     return ds_list, unmapped_ds_list
+
+
+
+
+############################################
+### Functions for loading saved datasets ###
+############################################
+
+def get_train_dataset_from_saved(train_args: MyTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def add_special_tokens(batch, add_eos=True):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        if add_eos:
+            batch['target'] = [i + tokenizer.eos_token for i in batch['target']]
+            batch['loss_mask'] = [i + [1] for i in batch['loss_mask']]
+        return batch
+
+    def mask_target(target_ids, loss_mask):
+        return [t if m == 1 else -100 for t, m in zip(target_ids, loss_mask)]
+
+    def tokenization(batch):
+        batch_new = {}
+        prompt_ids = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False)
+        target_ids = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)
+        batch_new['input_ids'] = [p + t for p, t in zip(prompt_ids['input_ids'], target_ids['input_ids'])]
+        batch_new['labels'] = [[-100] * (len(p)) + mask_target(t, m) for p, t, m in zip(prompt_ids['input_ids'], target_ids['input_ids'], batch['loss_mask'])]
+        batch_new['attention_mask'] = [p + t for p, t in zip(prompt_ids['attention_mask'], target_ids['attention_mask'])]
+        # batch_new['labels'] = [p + t for p, t in zip(prompt_ids, target_ids)]
+        # batch_new['example_ids'] = [[i] * len(p + t) for i, (p, t) in enumerate(zip(prompt_ids, target_ids))]
+        return batch_new
+
+    ds_list = []
+    ds0_list = [] # original version without special tokens and tokenization
+    if len(args.op_dist_train) > 1:
+        fracs = [max(x,y) for x,y in zip(*args.op_dist_train)]
+    else:
+        fracs = args.op_dist_train[0] # fracs = (1.0,)
+
+    train_file_list = [os.path.join('data/train', args.data_from_saved_train_base)]
+    for data_from_saved_train_new in args.data_from_saved_train_new:
+        train_file_list.append(os.path.join(args.train_file_from_model, data_from_saved_train_new))
+
+    print(f'Loading from {train_file_list}')
+    for train_file in train_file_list:
+        print(f'Loading {train_file}')        
+        
+        kwargs = {'num_proc': args.nproc}
+
+        if os.path.exists(train_file):
+            print(f'Loading {train_file}')
+            ds0 = load_dataset(train_file, split='train')
+            print(f'{train_file} has {len(ds0)} examples!!')
+        else:
+            print(f'Error: {train_file} does not exist')
+            exit()
+        
+        ds0_list.append(ds0)
+        ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
+        remove_columns = ['prompt', 'target', 'loss_mask']
+        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=remove_columns, **kwargs)
+        if not args.use_iterable_dataset and args.load_as_iterable_dataset:
+            ds = ds.to_iterable_dataset(num_shards=args.nproc)
+        ds_list.append(ds)
+
+
+    init_probs = [frac / sum(args.op_dist_train[0]) for frac in args.op_dist_train[0]]
+    if len(args.op_dist_train) > 1:
+        from multiprocessing import Array
+        from ctypes import c_double
+        init_probs = Array(c_double, init_probs)
+
+    ds = interleave_datasets(ds_list, seed=train_args.seed, stopping_strategy='all_exhausted')
+
+    print('----------- Examples from train (generated from model): -------------')
+    for example in itertools.islice(ds, 0, 100):
+        # print(example['input_ids'])
+        print(tokenizer.decode(example['input_ids']))
+        # print(example['labels'])
+        print(tokenizer.decode(example['labels']))
+        # breakpoint()
+    #     l.append(len(example['input_ids']))
+    
+    if not args.use_train_attention_mask:
+        ds = ds.remove_columns('attention_mask')
+    
+    return ds
+
+
+def get_eval_dataset_from_saved(train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def add_special_tokens(batch, add_eos=True):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        if add_eos:
+            batch['target'] = [i + tokenizer.eos_token for i in batch['target']]
+            batch['real_target'] = [i + tokenizer.eos_token for i in batch['real_target']]
+            batch['loss_mask'] = [i + [1] for i in batch['loss_mask']]
+        return batch
+
+    def tokenization(batch):
+        batch_new = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False, return_token_type_ids=False)
+        batch_new['labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
+        for k in batch_new.keys():
+            batch_new['eval_' + k] = batch_new.pop(k)
+        batch_new['eval_loss_mask'] = batch['loss_mask']
+        return batch_new
+
+    ds_list = {}
+    unmapped_ds_list = {}
+
+    for num_digit in range(*args.n_digits_eval):
+        ds0_list = []
+        for opi, frac in enumerate(args.op_dist_eval):
+            eval_file = os.path.join(args.eval_file_from_model, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{num_digit}-{args.num_eval}')
+            
+            if not args.no_seed_for_data:
+                eval_file += f'-{train_args.seed}'
+            else:
+                eval_file += '-43'
+                
+            # load data
+            if os.path.exists(eval_file):
+                print(f'Loading {eval_file}')
+                ds0 = load_dataset(eval_file, split='test')
+                print(f'{eval_file} has {len(ds0)} examples!!')
+            else:
+                print(f'Error: {eval_file} does not exist')
+                exit()
+
+            ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
+            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'loss_mask'])
+
+            key = get_dataset_display_name(num_digit, args.op_eval[opi], args.format_eval[opi])
+            ds_list[key] = ds
+            unmapped_ds_list[key] = ds0
+            # print(f'cleaned up {ds_list[n_digits].cleanup_cache_files()}')
+            ds0_list.append(ds0)
+            
+
+    print('----------- Examples from eval: -------------')
+    for ds in ds_list.values():
+        for example in ds.take(1):
+            # print(example['eval_input_ids'])
+            print(tokenizer.decode(example['eval_input_ids']))
+            # print(example['eval_labels'])
+            print(tokenizer.decode(example['eval_labels']))
+    
+    return ds_list, unmapped_ds_list
+
+
+
+''' batchify the generation process
+
+def get_train_dataset_from_model2(answer_model, train_dataset, train_args: MyTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def add_special_tokens(batch, add_eos=True):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        if add_eos:
+            batch['target'] = [i + tokenizer.eos_token for i in batch['target']]
+            batch['real_target'] = [i + tokenizer.eos_token for i in batch['real_target']]
+            batch['loss_mask'] = [i + [1] for i in batch['loss_mask']]
+        return batch
+
+    def mask_target(target_ids, loss_mask):
+        return [t if m == 1 else -100 for t, m in zip(target_ids, loss_mask)]
+
+    def tokenization(batch):
+        batch_new = {}
+        prompt_ids = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False)
+        target_ids = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)
+        batch_new['input_ids'] = [p + t for p, t in zip(prompt_ids['input_ids'], target_ids['input_ids'])]
+        batch_new['labels'] = [[-100] * (len(p)) + mask_target(t, m) for p, t, m in zip(prompt_ids['input_ids'], target_ids['input_ids'], batch['loss_mask'])]
+        batch_new['attention_mask'] = [p + t for p, t in zip(prompt_ids['attention_mask'], target_ids['attention_mask'])]
+        # batch_new['labels'] = [p + t for p, t in zip(prompt_ids, target_ids)]
+        # batch_new['example_ids'] = [[i] * len(p + t) for i, (p, t) in enumerate(zip(prompt_ids, target_ids))]
+        return batch_new
+
+    ds_list = []
+    ds0_list = [] # original version without special tokens and tokenization
+    if len(args.op_dist_train) > 1:
+        fracs = [max(x,y) for x,y in zip(*args.op_dist_train)]
+    else:
+        fracs = args.op_dist_train[0] # fracs = (1.0,)
+    for opi, frac in enumerate(fracs):
+        ds_class = Dataset
+        os.makedirs(args.train_file_from_model, exist_ok=True)
+        train_file = os.path.join(args.train_file_from_model, f'{args.op_train[opi]}-{args.format_train[opi]}-{args.n_digits_train[opi][0]}_{args.n_digits_train[opi][1]}-{args.num_train[opi]}')
+        
+        if not args.no_seed_for_data:
+            train_file += f'-{train_args.seed}'
+        else:
+            train_file += '-43'
+        
+        kwargs = {'num_proc': args.nproc}
+        kwargs2 = {'keep_in_memory': True, 'cache_dir': train_file, 'split': 'train'}
+
+        if os.path.exists(train_file):
+            print(f'Loading {train_file}')
+            ds0 = load_dataset(train_file, split='train')
+        else:
+            ds0 = ds_class.from_generator(
+                data_generator_from_model,
+                gen_kwargs={
+                    'answer_model': answer_model,
+                    'dataset': train_dataset,
+                    'tokenizer': tokenizer,
+                    'train': True, 
+                    'shard': [range(i * round((args.num_train[opi] * frac) // args.nproc), max(1, (i + 1) * round((args.num_train[opi] * frac) // args.nproc))) for i in range(args.nproc)],
+                    'seed': train_args.seed,
+                    # 'n_digits': n_digits,
+                    'device': train_args.device
+                },
+                **(kwargs | kwargs2)
+            )
+        
+        ds0_list.append(ds0)
+        ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens}, **kwargs)
+        remove_columns = ['prompt', 'target', 'loss_mask']
+        ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=remove_columns, **kwargs)
+        if not args.use_iterable_dataset and args.load_as_iterable_dataset:
+            ds = ds.to_iterable_dataset(num_shards=args.nproc)
+        ds_list.append(ds)
+
+    # save as csv (the original version! without special tokens and tokenization)
+    ds_to_save = concatenate_datasets(ds0_list)
+    ds_to_save.to_csv(train_file+'.csv')
+    print(f'Saved {train_file}.csv')
+
+    init_probs = [frac / sum(args.op_dist_train[0]) for frac in args.op_dist_train[0]]
+    if len(args.op_dist_train) > 1:
+        from multiprocessing import Array
+        from ctypes import c_double
+        init_probs = Array(c_double, init_probs)
+
+    init_probs_uniform = np.full(len(args.op_dist_train[0]), 1/len(args.op_dist_train[0])) # [1.]
+    is_close_to_uniform = np.allclose(init_probs, init_probs_uniform) # True
+    if is_close_to_uniform:
+        init_probs = None
+
+    ds = interleave_datasets(ds_list, probabilities=init_probs, seed=train_args.seed, stopping_strategy='all_exhausted')
+    # .map(group_texts, batched=True, batch_size=1000, num_proc=16)
+    # print(f'Cleaned up: {ds.cleanup_cache_files()}')
+
+    # This adds the correct attention masks for packed sequences, but its extremely slow
+    # ds = ds.with_format('torch').map(add_attn_masks, batched=True, batch_size=1000, num_proc=16)
+
+    # l = []
+    print('----------- Examples from train (generated from model): -------------')
+    for example in itertools.islice(ds, 0, 100):
+        # print(example['input_ids'])
+        print(tokenizer.decode(example['input_ids']))
+        # print(example['labels'])
+        print(tokenizer.decode(example['labels']))
+        # breakpoint()
+    #     l.append(len(example['input_ids']))
+    
+    if not args.use_train_attention_mask:
+        ds = ds.remove_columns('attention_mask')
+    
+    return ds
+
+def get_eval_datasets_from_model2(answer_model, eval_datasets, train_args: Seq2SeqTrainingArguments, args: DataArguments, tokenizer: PreTrainedTokenizer):
+    def add_special_tokens(batch, add_eos=True):
+        batch['prompt'] = [tokenizer.bos_token + i for i in batch['prompt']]
+        if add_eos:
+            batch['target'] = [i + tokenizer.eos_token for i in batch['target']]
+            batch['real_target'] = [i + tokenizer.eos_token for i in batch['real_target']]
+            batch['loss_mask'] = [i + [1] for i in batch['loss_mask']]
+        return batch
+    
+    def tokenization(batch):
+        batch_new = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False, return_token_type_ids=False)
+        batch_new['labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
+        batch_new['real_labels'] = tokenizer(batch['real_target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
+
+        for k in list(batch_new.keys()):
+            batch_new['eval_' + k] = batch_new.pop(k)
+        batch_new['eval_loss_mask'] = batch['loss_mask']
+
+        return batch_new
+
+    def generate_from_model(batch):
+        batch['prompt'] = [tokenizer.decode(i, skip_special_tokens=True) for i in batch['eval_input_ids']]
+
+        input_ids = torch.tensor(batch['eval_input_ids']).to(train_args.device)  # Already tokenized
+        attention_mask = torch.tensor(batch['eval_attention_mask']).to(train_args.device)
+        batch_size = input_ids.size(0)
+
+        # Generate predictions from the model
+        with torch.no_grad():
+            generated_ids = answer_model.generate(input_ids, max_new_tokens=n_digits + 1, eos_token_id=tokenizer.eos_token_id, attention_mask=attention_mask, pad_token_id=tokenizer.pad_token_id)
+        
+        # Decode generated ids and create loss mask
+        generated_targets = []
+        for i in range(batch_size):
+            input_length = len(batch['eval_input_ids'][i])  # Length of the original input
+            generated_output = generated_ids[i][input_length:]  # Remove the input portion, keep only generated tokens
+            generated_target = tokenizer.decode(generated_output, skip_special_tokens=True)
+            generated_targets.append(generated_target)
+                
+        loss_mask = [[1] * len(target) for target in generated_targets]
+        
+        batch['target'] = generated_targets
+        batch['loss_mask'] = loss_mask
+        batch['real_target'] = [tokenizer.decode(i, skip_special_tokens=True) for i in batch['eval_labels']]
+
+        return batch
+
+    ds_list = {}
+    unmapped_ds_list = {}
+
+    for key in eval_datasets.keys():
+        n_digits = int(key.split('-')[0])
+        ds0_list = []
+        ds_list_save = []
+        for opi, frac in enumerate(args.op_dist_eval):
+            os.makedirs(args.eval_file_from_model, exist_ok=True)
+            eval_file = os.path.join(args.eval_file_from_model, f'{args.op_eval[opi]}-{args.format_eval[opi]}-{n_digits}-{args.num_eval}')
+            
+            if not args.no_seed_for_data:
+                eval_file += f'-{train_args.seed}'
+            else:
+                eval_file += '-43'
+            
+            import ipdb; ipdb.set_trace()
+            if os.path.exists(eval_file):
+                print(f'Loading {eval_file}')
+                # try load_dataset and if it fails, then load from disk
+                try: 
+                    ds0 = load_dataset(eval_file, split='test')
+                except:
+                    ds0 = load_from_disk(eval_file)
+            else:
+                ds0 = eval_datasets[key]
+
+            # Add special tokens based on decoded 'prompt' and 'target'
+            # ds0[0] {'eval_input_ids': [3, 34, 66, 78, 62, 86], 'eval_attention_mask': [1, 1, 1, 1, 1, 1], 'eval_labels': [60, 59, 1], 'eval_loss_mask': [1, 1, 1]}
+                        
+                # Batch generation instead of one-by-one generation
+                ds = ds0.map(generate_from_model, batched=True, batch_size=1000)
+                # {'eval_input_ids': [3, 34, 66, 78, 62, 86], 'eval_attention_mask': [1, 1, 1, 1, 1, 1], 'eval_labels': [60, 59, 1], 'eval_loss_mask': [1, 1, 1], 
+                # 'prompt': 'C8+4=', 'target': '50', 'loss_mask': [1, 1], 'real_target': '21'}
+                # add only 'prompt', target', 'real_target', 'loss_mask' columns to ds0_list
+                ds0_list.append(ds.select_columns(['prompt', 'target', 'real_target']))
+
+                ds = ds.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
+                #{'eval_input_ids': [3, 34, 66, 78, 62, 86], 'eval_attention_mask': [1, 1, 1, 1, 1, 1], 'eval_labels': [60, 59, 1], 'eval_loss_mask': [1, 1, 1], 
+                # 'prompt': '[BOS]C8+4=', 'target': '50[EOS]', 'loss_mask': [1, 1, 1], 'real_target': '21[EOS]'}
+
+                ds = ds.map(tokenization, batched=True, batch_size=1000, remove_columns=['prompt', 'target', 'real_target', 'loss_mask'])
+                # {'eval_input_ids': [3, 34, 66, 78, 62, 86], 'eval_attention_mask': [1, 1, 1, 1, 1, 1], 'eval_labels': [63, 58, 1], 'eval_loss_mask': [1, 1, 1], 'real_target': '21[EOS]'}
+
+                key = get_dataset_display_name(n_digits, args.op_eval[opi], args.format_eval[opi])
+                ds_list[key] = ds
+                unmapped_ds_list[key] = ds0
+                ds0_list.append(ds0)
+                ds_list_save.append(ds)
+        
+        # save ds to disk for future use
+        ds_list_save = concatenate_datasets(ds_list_save)
+        ds_list_save.save_to_disk(eval_file)
+            
+        ds_to_save = concatenate_datasets(ds0_list)
+        ds_to_save.to_csv(eval_file+'.csv')
+        print(f'Saved {eval_file}.csv')
+
+    print('----------- Examples from eval (generated from model): -------------')
+    for ds in ds_list.values():
+        for example in ds.take(1):
+            print(tokenizer.decode(example['eval_input_ids']))
+            print(tokenizer.decode(example['eval_labels']))
+
+    return ds_list, unmapped_ds_list
+
+    '''

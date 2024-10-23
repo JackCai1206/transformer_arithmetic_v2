@@ -12,7 +12,7 @@ from .data_formats import get_3parity, get_3sum, get_add1, get_copy, get_cumsum,
 
 import random
 import numpy as np
-from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, concatenate_datasets
+from datasets import IterableDataset, Dataset, interleave_datasets, disable_caching, enable_caching, concatenate_datasets, fingerprint
 from transformers import PreTrainedTokenizer, set_seed, Seq2SeqTrainingArguments
 from transformers.data.data_collator import _torch_collate_batch
 from trl.trainer.utils import DPODataCollatorWithPadding
@@ -464,7 +464,7 @@ def get_dpo_dataset(train_args: Seq2SeqTrainingArguments, args: DataArguments, t
 class PromptAnswerDataCollator(DPODataCollatorWithPadding):
     left_pad_list = ['prompt', 'eval_input_ids', 'eval_attention_mask']
     rand_pad_list = []
-    ignore_list = ['task_id']
+    ignore_list = ['task_id', 'n_digits', 'real_target']
 
     def __init__(self, pad_token_id=None, label_pad_token_id=None, train_pad_side='right', train_pad_to=None, eval_pad_to=None):
         super().__init__(pad_token_id=pad_token_id, label_pad_token_id=label_pad_token_id)
@@ -494,6 +494,7 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         }
         # print(f"Features: {features.keys()}")  # Debugging line
         # dict_keys(['loss_mask', 'input_ids', 'attention_mask', 'eval_labels']) 
+        # or dict_keys(['n_digits', 'task_id', 'input_ids', 'labels', 'attention_mask', 'real_target'])
         # or dict_keys(['prompt', 'loss_mask', 'chosen', 'rejected', 'chosen_input_ids', 'chosen_attention_mask', 'chosen_labels', 'rejected_input_ids', 'rejected_attention_mask', 'rejected_labels', 'prompt_input_ids', 'prompt_token_type_ids', 'prompt_attention_mask'])
 
         if len(self.rand_pad_list) > 0:
@@ -501,7 +502,7 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
 
         padded_batch = {}
         for k, feat in features.items():
-            # print(f"Processing feature (k): {k}, feat[0]: {feat[0]}, len: {len(feat[0])}")  # Debugging line
+            # print(f"Processing feature (k): {k}, feat[0]: {feat[0]},")# len: {len(feat[0])}")  # Debugging line
 
             if isinstance(feat[0], str): # Check if the feature is a string (-> prompt, chosen, rejected)
                 # print(f"feat is a string: {feat[0]}")  # Debugging line
@@ -509,7 +510,6 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
                 continue
 
             if k in self.ignore_list:
-                padded_batch[k] = torch.tensor(feat)
                 continue
 
             if k in self.left_pad_list:

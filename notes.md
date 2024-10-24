@@ -18,6 +18,7 @@
 - Given a min length, whats the max length that can be generalized to? 
   - poor performance for 4x and 8x
     - Conclusion is that max_len must be 2 * min_len
+    - actually, it seems to work on l=16,64, so max length probably plays a role
 - Vary only the model size and keep compute the same
 - Sample complexity
   - Compare multi-task vs single task full length
@@ -28,9 +29,18 @@
   - Compare with directly training on full length (probably is more)
   - What is the minimum tokens seen to learn the task? 
 - Task similarity
-  - Interleave copy, xor, a_i == b_i
-  - add 1
-  - Alternative format: map to characters
+  - keep input format the same
+    - pair-wise operations
+      - pair-wise addition (with bias)
+      - a_i == b_i, a_i != b_i, (a>=5) xor (b>=5), etc
+    - carry chain operations
+      - carry identification
+      - generate and propagate identification
+      - running sum
+      - modified carry rule (e.g. a_i + b_i + c_i >= 2)
+    - add 1 (at any position)
+  - Change input format
+    - swap numbers to characters
 
 ## COT "Chain-length generalization"
 - Show that TF can auto-compose the two reasoning steps

@@ -2,8 +2,8 @@ set -e
 
     # 8           32          1024        1          1024            \
     # 4           32          1024        1          1024            \
-    # 16          64          1024        1          1024            \
-    # 8           64          1024        1          1024            \
+    # 32          128         512         2          1024            \
+    # 16          128         512         2          1024            \
 
 export NCCL_P2P_DISABLE="1"
 export NCCL_IB_DISABLE="1"
@@ -42,7 +42,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --op_train='add add add' \
                     --format_train='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_train='1,1,1' \
-                    --n_digits_eval=$((train_high/8))','$((train_high+train_high/6+1))','$((train_high/8)) \
+                    --n_digits_eval=$((train_high/8))','$((train_high+train_high/8+1))','$((train_high/8)) \
                     --op_eval='add add add' \
                     --format_eval='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_eval='1 1 1' \

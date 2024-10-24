@@ -14,7 +14,7 @@ for seed in 42 43 44 45 46; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=small_dropout WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=small WANDB_MODE=online python run.py \
             --seed=$seed \
             --architecture=llama \
             --from_pretrained=False \
@@ -28,7 +28,7 @@ for seed in 42 43 44 45 46; do
             \
             --num_train=20000000 \
             --num_eval=$num_eval \
-            --n_digits_train='1,33 1,33 1,17' \
+            --n_digits_train='1,33 1,33 1,9' \
             --op_train='add add add' \
             --format_train='reverse-no-carry reverse-carry-only reverse' \
             --op_dist_train='1,1,1' \
@@ -46,10 +46,10 @@ for seed in 42 43 44 45 46; do
             --output_dir=out \
             --do_train=$do_train \
             --do_eval=True \
-            --max_steps=20000 \
+            --max_steps=100000 \
             --learning_rate=1e-3 \
             --lr_scheduler_type='warmup_stable_decay' \
-            --lr_scheduler_kwargs='{"num_stable_steps": 10000, "num_decay_steps": 8000, "min_lr_ratio": 0.1}' \
+            --lr_scheduler_kwargs='{"num_stable_steps": 40000, "num_decay_steps": 50000, "min_lr_ratio": 0.01}' \
             --adam_beta2=0.98 \
             --adam_epsilon=1e-12 \
             --weight_decay=0.01 \

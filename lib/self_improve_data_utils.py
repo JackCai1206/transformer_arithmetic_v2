@@ -383,7 +383,10 @@ def get_eval_dataset_from_saved(train_args: Seq2SeqTrainingArguments, args: Data
     def tokenization(batch):
         batch_new = tokenizer(batch['prompt'], padding='do_not_pad', add_special_tokens=False, return_token_type_ids=False)
         batch_new['labels'] = tokenizer(batch['target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
-        for k in batch_new.keys():
+        batch_new['real_labels'] = tokenizer(batch['real_target'], padding='do_not_pad', add_special_tokens=False)['input_ids']
+
+        for k in batch_new.copy().keys():
+            print(k)
             batch_new['eval_' + k] = batch_new.pop(k)
         batch_new['eval_loss_mask'] = batch['loss_mask']
         return batch_new
@@ -411,7 +414,7 @@ def get_eval_dataset_from_saved(train_args: Seq2SeqTrainingArguments, args: Data
                 exit()
 
             ds = ds0.map(add_special_tokens, batched=True, batch_size=1000, fn_kwargs={'add_eos': args.add_special_tokens})
-            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'loss_mask'])
+            ds = ds.map(tokenization, batched=True, batch_size=args.num_eval, remove_columns=['prompt', 'target', 'loss_mask', 'real_target'])
 
             key = get_dataset_display_name(num_digit, args.op_eval[opi], args.format_eval[opi])
             ds_list[key] = ds
@@ -427,6 +430,8 @@ def get_eval_dataset_from_saved(train_args: Seq2SeqTrainingArguments, args: Data
             print(tokenizer.decode(example['eval_input_ids']))
             # print(example['eval_labels'])
             print(tokenizer.decode(example['eval_labels']))
+            # print(example['eval_real_labels'])
+            print(tokenizer.decode(example['eval_real_labels']))
     
     return ds_list, unmapped_ds_list
 

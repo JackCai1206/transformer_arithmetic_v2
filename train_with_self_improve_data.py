@@ -25,6 +25,8 @@ data_args.train_file_from_model = f'data/train_from_model-{model_id}'
 
 train_dataset, eval_datasets = get_all_datasets_from_saved(train_args, data_args, tokenizer)
 
+train_args.get_real_label = True
+
 trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args, train_dataset, eval_datasets)
 
 # check local rank

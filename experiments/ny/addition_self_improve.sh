@@ -52,6 +52,7 @@ for seed in 41 42 43 44 45; do
 done
 
 
+
 # BEST: SEED: 43, num_train=10000000
 WANDB_PROJECT=self_improve 
 num_train=10000000
@@ -335,7 +336,7 @@ done
 ###################
 
 # different num_train, lr, seed
-
+# BEST: lr=5e-4
 set -e
 WANDB_PROJECT=self_improve 
 x=11
@@ -344,7 +345,7 @@ for num_train in 50000 100000 10000 500000; do
     for seed in 42 43 44; do
         for lr in 5e-4 1e-4 5e-5 1e-5; do
             CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online python train_with_self_improve_data.py \
-                --data_from_saved_train_base='add-reverse-1_10-20000000-43' \
+                --data_from_saved_train_base='add-reverse-1_10-20000000-43/generator/default-a1aa0d35b21235f1' \
                 --data_from_saved_train_new="add-reverse-${x}_${y}-${num_train}-43" \
                 \
                 \
@@ -408,7 +409,7 @@ for num_train in 50000 100000 10000 500000; do
     for seed in 42 43 44; do
         for lr in 5e-4 1e-4 5e-5 1e-5; do
             CUDA_VISIBLE_DEVICES=1 WANDB_MODE=online python train_with_self_improve_data.py \
-                --data_from_saved_train_base='add-reverse-1_10-20000000-43' \
+                --data_from_saved_train_base='add-reverse-1_10-20000000-43/generator/default-a1aa0d35b21235f1' \
                 --data_from_saved_train_new="add-reverse-${x}_${y}-${num_train}-43" \
                 \
                 \
@@ -618,7 +619,7 @@ CUDA_VISIBLE_DEVICES=1 WANDB_MODE='disabled' python train_with_self_improve_data
     --warmup_ratio=0.05 \
     --logging_steps=20 \
     --eval_strategy="steps" \
-    --eval_steps=100 \
+    --eval_steps=2 \
     --predict_with_generate \
     --per_device_train_batch_size=1024 \
     --per_device_eval_batch_size=1000 \

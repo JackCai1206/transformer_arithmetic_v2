@@ -495,6 +495,7 @@ class PromptAnswerDataCollator(DPODataCollatorWithPadding):
         # print(f"Features: {features.keys()}")  # Debugging line
         # dict_keys(['loss_mask', 'input_ids', 'attention_mask', 'eval_labels']) 
         # or dict_keys(['n_digits', 'task_id', 'input_ids', 'labels', 'attention_mask', 'real_target'])
+        # or dict_keys(['eval_input_ids', 'eval_attention_mask', 'eval_labels', 'eval_real_labels', 'eval_loss_mask'])
         # or dict_keys(['prompt', 'loss_mask', 'chosen', 'rejected', 'chosen_input_ids', 'chosen_attention_mask', 'chosen_labels', 'rejected_input_ids', 'rejected_attention_mask', 'rejected_labels', 'prompt_input_ids', 'prompt_token_type_ids', 'prompt_attention_mask'])
 
         if len(self.rand_pad_list) > 0:

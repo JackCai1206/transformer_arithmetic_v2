@@ -4,8 +4,28 @@ import Levenshtein
 import numpy as np
 
 from lib.configs import MyTrainingArguments
+from typing import Union, Tuple, Optional
+
+
+def get_real_label(input_str):
+    a, b = input_str.split('=')[0].split('+')
+    a = a.split('C')[1]
+    a = a[::-1]
+    b = b[::-1]
+    c = str(int(a) + int(b))
+    c = c[::-1]
+    c = c.ljust(max(len(a), len(b))+1, '0')
+
+    return c
 
 def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction, args: MyTrainingArguments):
+    # import ipdb; ipdb.set_trace()
+    '''
+    pred_obj: 
+        predictions: Union[np.ndarray, Tuple[np.ndarray]],
+        label_ids: Union[np.ndarray, Tuple[np.ndarray]],
+        inputs: Optional[Union[np.ndarray, Tuple[np.ndarray]]] = None,
+    '''
     pred = pred_obj.predictions[:, pred_obj.inputs.shape[1]:]
     labels = pred_obj.label_ids
     # Padding handled in the trainer predict
@@ -27,16 +47,36 @@ def compute_metrics(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction, ar
     accuracy = (pred == labels).all(axis=1).mean()
     distance = sum([Levenshtein.ratio(pred[bi].tolist(), labels[bi].tolist()) for bi in range(pred.shape[0])]) / pred.shape[0]
 
-    prompt_str = tokenizer.batch_decode(pred_obj.inputs[:5])
-    pred_str = tokenizer.batch_decode(pred_obj.predictions[:5, pred_obj.inputs.shape[1]:])
-    label_str = tokenizer.batch_decode(pred_obj.label_ids[:5])
-    for pr, p, l in zip(prompt_str, pred_str, label_str):
-        print("="*80)
-        print(f"Prompt: {repr(pr)}")
-        print(f"Pred  : {repr(p)}")
-        print(f"Label : {repr(l)}")
+    # Print debug information
+    prompt_str = tokenizer.batch_decode(pred_obj.inputs)
+    pred_str = tokenizer.batch_decode(pred_obj.predictions[:, pred_obj.inputs.shape[1]:], skip_special_tokens=True)
+    label_str = tokenizer.batch_decode(pred_obj.label_ids)
+    
+    metrics = {
+        'accuracy': accuracy,
+        'distance': distance
+    }
+    if args.get_real_label:
+        real_label_str = [get_real_label(pr) for pr in prompt_str]
+        reaL_acc = [real_label_str[i] == pred_str[i] for i in range(len(real_label_str))]
+        reaL_acc = sum(reaL_acc) / len(reaL_acc)
 
-    return {'accuracy': accuracy, 'distance': distance}
+        metrics['real_accuracy'] = reaL_acc
+    
+    prompt_str = prompt_str[:5]
+    pred_str = pred_str[:5]
+    label_str = label_str[:5]
+
+    for i, (pr, p, l) in enumerate(zip(prompt_str, pred_str, label_str)):
+        print("="*80)
+        print(f"Prompt     : {repr(pr)}")
+        print(f"Pred       : {repr(p)}")
+        print(f"Label      : {repr(l)}")
+        if args.get_real_label:
+            print(f"Real Label : {repr(real_label_str[i])}")
+
+
+    return metrics
 
 
 def compute_metrics_new(tokenizer: PreTrainedTokenizer, pred_obj: EvalPrediction, args: MyTrainingArguments):

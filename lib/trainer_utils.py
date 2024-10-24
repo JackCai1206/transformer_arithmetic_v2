@@ -5,6 +5,7 @@ from datasets import Dataset
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback, TrainerControl, TrainerState
 from transformers.integrations import WandbCallback
 from transformers.training_args import TrainingArguments
+from transformers import EvalPrediction
 from trl import DPOTrainer, DPOConfig
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -106,6 +107,13 @@ class Seq2SeqTrainerNoEvalLoss(Seq2SeqTrainer):
         )
 
         generation_inputs = inputs.copy()
+
+        real_labels = None
+        if 'real_labels' in inputs.keys():
+            real_labels = inputs['real_labels']
+            generation_inputs.pop('real_labels')
+
+        
         # If the `decoder_input_ids` was created from `labels`, evict the former, so that the model can freely generate
         # (otherwise, it would continue generating from the padded `decoder_input_ids`)
         if (
@@ -462,3 +470,14 @@ class BacktrackLogitsProcessorWithoutRetry(LogitsProcessor):
 
         self.count += 1
         return scores
+
+
+class Seq2SeqTrainerWithRealLabels(Seq2SeqTrainerNoEvalLoss):
+     def evaluate(self, *args, **kwargs):
+        # Call the parent class's evaluate method
+        output = super().evaluate(*args, **kwargs)
+
+        # change the eval_dataset to include the real labels
+        output = super().evaluate(*args, **kwargs)
+
+

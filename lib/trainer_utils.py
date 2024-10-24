@@ -1,8 +1,10 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from functools import partial, reduce
+import random
 from datasets import Dataset
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback, TrainerControl, TrainerState
+from transformers.trainer_callback import ExportableState
 from transformers.integrations import WandbCallback
 from transformers.training_args import TrainingArguments
 from trl import DPOTrainer, DPOConfig
@@ -200,7 +202,7 @@ class AddWandbConfigCallback(WandbCallback):
 
 import re
 
-class EarlyStoppingCallback(TrainerCallback):
+class EarlyStoppingCallback(TrainerCallback, ExportableState):
     def __init__(self, metric_names, thresholds, patience):
         self.patience_counter = {}
         self.metric_names = metric_names
@@ -221,21 +223,35 @@ class EarlyStoppingCallback(TrainerCallback):
         return all(self.patience_counter[test_set_idx] <= 0 for test_set_idx in self.patience_counter)
 
     def on_evaluate(self, args, state: TrainerState, control: TrainerControl, model, metrics, **kwargs):
-        if state.global_step > state.eval_steps: # Skip the first evaluation
+        if self.test_set_idx in self.patience_counter: # Skip the first evaluation, because it populates the patience counter
             control.should_training_stop = self.should_stop(state, metrics)
         else:
             self.patience_counter[self.test_set_idx] = self.patience
         self.test_set_idx += 1
 
     def on_step_begin(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
-        for test_set_idx in self.patience_counter:
-            self.patience_counter[test_set_idx] = self.patience
-        self.test_set_idx = 0
+        if state.global_step % state.eval_steps == 1:
+            for test_set_idx in self.patience_counter:
+                self.patience_counter[test_set_idx] = self.patience
+            self.test_set_idx = 0
     
     # def on_step_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
     #     if state.total_flos >= 511_920_053_762_457_600:
     #         control.should_training_stop = True
     #         control.should_evaluate = True
+    
+    def state(self) -> dict:
+        return {
+            'args': {
+                'metric_names': self.metric_names,
+                'thresholds': self.thresholds,
+                'patience': self.patience
+            },
+            'attributes': {
+                'patience_counter': self.patience_counter,
+                'test_set_idx': self.test_set_idx
+            }
+        }
 
 class DataMixtureSchedulingCallback(TrainerCallback):
     def __init__(self, init, end, schedule='cosine', wait_before=0, wait_after=0.3, update_every=10):
@@ -264,6 +280,31 @@ class DataMixtureSchedulingCallback(TrainerCallback):
     def on_log(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, logs=None, **kwargs):
         mix = kwargs['train_dataloader'].dataset._ex_iterable.probabilities
         logs |= {f'mix_{i}': round(p, 3) for i, p in enumerate(mix)}
+
+
+# class SaveRandomStateCallback(TrainerCallback, ExportableState):
+#     def on_save(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+#         self.random_state = random.getstate()
+#         self.np_random_state = np.random.get_state()
+#         self.torch_random_state = torch.random.get_rng_state()
+#         self.torch_cuda_random_state = torch.cuda.get_rng_state()
+    
+#     def on_init_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+#         if args.resume_from_checkpoint is not None:
+#             random.setstate(self.random_state)
+#             np.random.set_state(self.np_random_state)
+#             torch.random.set_rng_state(self.torch_random_state)
+#             torch.cuda.set_rng_state(self.torch_cuda_random_state)
+    
+#     def state(self) -> dict:
+#         return {
+#             'attributes':{
+#                 'random_state': self.random_state,
+#                 'np_random_state': self.np_random_state,
+#                 'torch_random_state': self.torch_random_state,
+#                 'torch_cuda_random_state': self.torch_cuda_random_state
+#             }
+#         }
 
 from transformers import Constraint, LogitsProcessor
 

@@ -22,6 +22,8 @@ from transformers.trainer_utils import get_last_checkpoint
 from datasets import Dataset
 from peft import LoraConfig, get_peft_model
 
+# torch._dynamo.config.optimize_ddp=False
+
 def get_args():
     args, model_args, data_args, train_args = HfArgumentParser((ScriptArguments, ModelArguments, DataArguments, MyTrainingArguments)).parse_args_into_dataclasses()
     args = cast(ScriptArguments, args)
@@ -205,6 +207,8 @@ def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, token
         print(f"Number of parameters: {model.num_parameters()}")
         print(f"Number of trainable parameters: {model.num_parameters(only_trainable=True)}")
 
+    # model.resize_token_embeddings(len(tokenizer), pad_to_multiple_of=64)
+
     return model
 
 def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
@@ -242,6 +246,7 @@ def prepare_train_args(train_args: MyTrainingArguments, model_args: ModelArgumen
     train_args.dataloader_num_workers = data_args.nproc
     train_args.dataloader_prefetch_factor = 16
     train_args.remove_unused_columns = False
+    # train_args.ignore_data_skip = True # It takes a long time to skip the data, so we will just restore the random state
     
     if train_args.resume_from_checkpoint == 'True':
         # Try finding a checkpoint in the output directory
@@ -295,5 +300,10 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
     if len(data_args.op_dist_train) > 1:
         MixtureCB = DataMixtureSchedulingCallback(init=data_args.op_dist_train[0], end=data_args.op_dist_train[1], **data_args.mixture_scheduling_kwargs)
         trainer.callback_handler.callbacks.insert(0, MixtureCB)
+
+    # if train_args.ignore_data_skip:
+    #     # instead of skipping the data, we will just restore the random state
+    #     SaveRandomStateCB = SaveRandomStateCallback()
+    #     trainer.add_callback(SaveRandomStateCB)
 
     return trainer

@@ -51,15 +51,6 @@ def get_tokenizer(model_args: ModelArguments, data_args: DataArguments):
 
     return tokenizer
 
-def get_all_datasets(train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
-    train_dataset, eval_datasets = None, None
-    if train_args.do_eval:
-        eval_datasets, unmapped_eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
-    if train_args.do_train:
-        train_dataset = get_train_dataset(train_args, data_args, tokenizer, no_sample_from=unmapped_eval_datasets)
-    tokenizer.padding_side = 'left' # in case it was changed by the data generator
-    return train_dataset, eval_datasets
-
 def get_model(train_args: MyTrainingArguments, model_args: ModelArguments, tokenizer: PreTrainedTokenizer):
     if model_args.model_id is not None:
         model: PreTrainedModel
@@ -326,6 +317,27 @@ def get_trainer(args: ScriptArguments, data_args: DataArguments, model_args: Mod
         trainer.add_callback(CustomParameterLoggingCB)
 
     return trainer
+
+
+def get_all_datasets(train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):
+    train_dataset, eval_datasets = None, None
+    if train_args.do_eval:
+        if train_args.get_real_label:
+            from lib.self_improve_data_utils import get_eval_dataset_from_saved
+            if data_args.eval_file_from_model is None:
+                model_id = '/'.join(train_args.resume_from_checkpoint.split('/')[-2:]).replace('/', '_') 
+                print('model_id:', model_id)
+                data_args.eval_file_from_model = f'data/eval_from_model-{model_id}'
+
+            else:
+                data_args.eval_file_from_model = f'data/eval_from_model-{data_args.eval_file_from_model}'
+            eval_datasets, unmapped_eval_datasets = get_eval_dataset_from_saved(train_args, data_args, tokenizer)
+        else:
+            eval_datasets, unmapped_eval_datasets = get_eval_dataset(train_args, data_args, tokenizer)
+    if train_args.do_train:
+        train_dataset = get_train_dataset(train_args, data_args, tokenizer, no_sample_from=unmapped_eval_datasets)
+    tokenizer.padding_side = 'left' # in case it was changed by the data generator
+    return train_dataset, eval_datasets
 
 
 def get_all_datasets_from_model(answer_model, train_dataset, eval_datasets, train_args: MyTrainingArguments, data_args: DataArguments, tokenizer: PreTrainedTokenizer):

@@ -465,6 +465,59 @@ for num_train in 50000 100000 10000 500000; do
 done
 
 
+# eval
+WANDB_PROJECT=self_improve
+x=11
+y=12
+for num_train in 50000 100000 10000 500000; do
+    for seed in 42 43 44; do
+        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=backtrack WANDB_MODE=online python eval.py \
+            --get_real_label=True \
+            --eval_file_from_model='reverse_20000000-llama-384-6-6-1024-reverse-digits-1_10_-seed-44_checkpoint-10000' \
+            --should_save=False \
+            \
+            \
+            --wandb_project=$WANDB_PROJECT \
+            --seed=$seed \
+            --architecture=llama \
+            --from_pretrained=False \
+            --hidden_size=384 \
+            --intermediate_size=1536 \
+            --num_attention_heads=6 \
+            --num_layers=6 \
+            --max_position_embeddings=1024 \
+            \
+            \
+            --no_seed_for_data=True \
+            --num_train=$num_train \
+            --num_eval=1000 \
+            --n_digits_train="${x},${y}" \
+            --op_train='add' \
+            --format_train='reverse' \
+            --n_digits_eval='1,21,1' \
+            --op_eval='add' \
+            --format_eval='reverse' \
+            --show_task_ids=True \
+            --padding_side='right' \
+            \
+            \
+            --result_name='result' \
+            --resume_from_checkpoint="out/self_improve2/reverse_${x}_${y}-${num_train}-5e-4-llama-384-6-6-1024-reverse-digits-11_12_-seed-${seed}" \
+            --run_name="reverse_${num_train}" \
+            --output_dir=out \
+            --do_train=False \
+            --do_eval=True \
+            --predict_with_generate \
+            --per_device_train_batch_size=1024 \
+            --per_device_eval_batch_size=256 \
+            --gradient_accumulation_steps=2 \
+            --include_inputs_for_metrics=True \
+            --torch_compile=True \
+            --bf16=True \
+            --tf32=True 
+    done
+done
+
 
 ###################
 #### DEBUGGING ####

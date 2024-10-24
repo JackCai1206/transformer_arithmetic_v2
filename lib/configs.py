@@ -12,6 +12,8 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     do_backtrack_eval: bool = False # erases backtrack tokens during evaluation
     backtrack_decoding_multiplier: Optional[int] = 3 # Multiplier for the number of max_new_tokens
 
+    get_real_label: Optional[bool] = False # if True, then evaluate with the real label instead of the generated label (for self-improve)
+
     do_dpo: bool = False
 
     early_stopping: Optional[bool] = False # Stop training when the model reaches a certain metric
@@ -23,6 +25,7 @@ class MyTrainingArguments(Seq2SeqTrainingArguments):
     early_stop: bool = False
 
     output_dir: Optional[str] = 'out'
+    should_save: Optional[bool] = True # If false, surpress creating new directories for Trainer
 
 
 @dataclass
@@ -33,6 +36,7 @@ class ScriptArguments:
     dpo_beta: Optional[float] = 0.1
     eval_more: Optional[bool] = False # use compute_metrics_new instead of compute_metrics if True
     wandb_project: Optional[str] = 'backtrack'
+    result_name: Optional[str] = 'result'
     
     
 @dataclass
@@ -91,7 +95,9 @@ class DataArguments:
     no_seed_for_data: bool = False
     data_from_saved_train_base: Optional[str] = None # original data that was used to train initial model, directory after 'data/train'
     data_from_saved_train_new: Optional[Union[Tuple[str], str]] = None # directory after 'data/train_from_model-.../'
-    
+    eval_file_from_model: Optional[str] = None # directory after 'data/eval_from_model-.../'
+    train_file_from_model: Optional[str] = None # directory after 'data/train_from_model-.../'
+
     
     def __post_init__(self):
     #     if self.format.startswith("{"):

@@ -31,6 +31,7 @@
   - Interleave copy, xor, a_i == b_i
   - add 1
   - Alternative format: map to characters
+  - Add characters to the task id
 
 ## COT "Chain-length generalization"
 - Show that TF can auto-compose the two reasoning steps

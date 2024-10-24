@@ -14,7 +14,7 @@ for seed in 42 43 44 45 46; do
         for resume do_train num_eval in \
             False True 1024 \
         ; do
-        CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=small_dropout WANDB_MODE=online python run.py \
+        CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=small_dropout WANDB_MODE=online python run.py \
             --seed=$seed \
             --architecture=llama \
             --from_pretrained=False \

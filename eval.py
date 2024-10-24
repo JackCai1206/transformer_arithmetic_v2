@@ -47,7 +47,7 @@ trainer = get_trainer(args, data_args, model_args, model, tokenizer, train_args,
 if train_args.do_dpo:
     train_args.save_safetensors = True
 
-# trainer._load_from_checkpoint(resume_from_checkpoint=train_args.resume_from_checkpoint)
+trainer._load_from_checkpoint(resume_from_checkpoint=train_args.resume_from_checkpoint)
 
 dir_name = '/'.join(train_args.resume_from_checkpoint.split('/')[:-1])
 # check if the directory exists (assert)

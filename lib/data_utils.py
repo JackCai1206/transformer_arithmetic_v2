@@ -167,10 +167,10 @@ def data_generator(
             prompt = chr(ord('A') + task_id) * 4 + prompt + chr(ord('A') + task_id) * 4
         
         if disjoint_tokens:
-            if task_id == 1:
+            if task_id == 0:
                 prompt = prompt.translate(str.maketrans('0123456789', 'abcdefghij'))
                 target = target.translate(str.maketrans('0123456789', 'abcdefghij'))
-            elif task_id == 2:
+            elif task_id == 1:
                 prompt = prompt.translate(str.maketrans('0123456789', 'klmnopqrst'))
                 target = target.translate(str.maketrans('0123456789', 'klmnopqrst'))
 

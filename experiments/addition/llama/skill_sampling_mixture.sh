@@ -9,8 +9,8 @@ export NCCL_P2P_DISABLE="1"
 export NCCL_IB_DISABLE="1"
 
 for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
-    16          128         512         1          1024            \
-    32          128         512         1          1024            \
+    20          120         512         2          1024            \
+    32          128         512         2          1024            \
     16          64          1024        1          1024            \
     8           64          1024        1          1024            \
     8           32          1024        1          1024            \
@@ -24,7 +24,7 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                 False True 1024 \
             ; do
                 # CUDA_VISIBLE_DEVICES=0,1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-length WANDB_MODE=online OMP_NUM_THREADS=16 torchrun --nnodes=1 --nproc_per_node=2 run.py \
-                CUDA_VISIBLE_DEVICES=1 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-length WANDB_MODE=online python run.py \
+                CUDA_VISIBLE_DEVICES=0 WANDB_PROJECT=LG-inherit WANDB_RUN_GROUP=sweep-length WANDB_MODE=online python run.py \
                     --seed=$seed \
                     --architecture=llama \
                     --from_pretrained=False \
@@ -47,9 +47,9 @@ for train_low   train_high  batch_size  grad_acc   eval_batch_size in \
                     --format_eval='reverse-no-carry reverse-carry-only reverse' \
                     --op_dist_eval='1 1 1' \
                     --show_task_ids=True \
-                    --padding_side='random' \
+                    --padding_side='right' \
                     --use_train_attention_mask=True \
-                    --disjoint_tokens=True \
+                    --disjoint_tokens=False \
                     \
                     \
                     --track_num_tokens_seen_by_task=True \

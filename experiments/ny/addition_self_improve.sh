@@ -336,14 +336,15 @@ done
 ###################
 
 # different num_train, lr, seed
-# BEST: lr=5e-4
+# BEST: lr=5e-4 # 
+# for lr in 5e-4 1e-4 5e-5 1e-5; do
 set -e
 WANDB_PROJECT=self_improve 
 x=11
 y=12
 for num_train in 50000 100000 10000 500000; do
-    for seed in 42 43 44; do
-        for lr in 5e-4 1e-4 5e-5 1e-5; do
+    for seed in 41 42 43 44 45; do
+            for lr in 5e-4; do
             CUDA_VISIBLE_DEVICES=0 WANDB_MODE=online python train_with_self_improve_data.py \
                 --data_from_saved_train_base='add-reverse-1_10-20000000-43/generator/default-a1aa0d35b21235f1' \
                 --data_from_saved_train_new="add-reverse-${x}_${y}-${num_train}-43" \
@@ -681,3 +682,4 @@ CUDA_VISIBLE_DEVICES=1 WANDB_MODE='disabled' python train_with_self_improve_data
     --bf16=True \
     --tf32=True \
     --torch_compile=True
+

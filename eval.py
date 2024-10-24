@@ -53,6 +53,10 @@ dir_name = '/'.join(train_args.resume_from_checkpoint.split('/')[:-1])
 # check if the directory exists (assert)
 assert os.path.exists(dir_name)
 
+if os.path.exists(f'{dir_name}/{args.result_name}.csv'):
+    print(f"Results already saved to {dir_name}/{args.result_name}.csv")
+    exit()
+
 result = trainer.evaluate()
 
 print(result)

@@ -58,6 +58,7 @@ class DataArguments:
     format_eval: Optional[Union[Tuple[str], str]] = 'reverse'
     add_special_tokens: bool = True
     show_task_ids: bool = True
+    disjoint_tokens: bool = False
     padding_side: str = 'right'
     use_train_attention_mask: bool = True
     train_pad_to: Optional[int] = None

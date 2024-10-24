@@ -44,12 +44,6 @@ def get_COT(a, b):
     #     breakpoint()
     return prompt, cot, None
 
-def get_add1(a, b):
-    if random() < 0.5:
-        return f'{a[::-1]}+1{"0"*(len(b)-1)}=', str(int(a) + 1)[::-1], None
-    else:
-        return f'A1{"0"*(len(b)-1)}+{a[::-1]}=', str(int(a) + 1)[::-1], None
-
 def get_reverse_add_automata(a, b, type='A'):
     c = 0
     s = '0'
